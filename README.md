@@ -1,9 +1,14 @@
 CHARM2.0: Cosmic History Agnostic Reconstruction Method
 =================
 
-ToDo: Update this readme.
+Reconstructing cosmic expansion history (cosmic energy density as a function of redshift) from Supernovae
+type Ia. 
 
-Reconstructing cosmic expansion history (cosmic energy density as a function of redshift) 
+Assumptions: 
+- Friedmannian Cosmology
+- The energy density parameters $\Omega$
+
+
 without assuming a specific type of matter distribution in the Universe. Data are distance moduli and
 redshifts from Supernovae Ia from the 
 [Union2.1](https://supernova.lbl.gov/Union/) compilation and [Pantheon+](https://pantheonplussh0es.github.io) Analysis.
