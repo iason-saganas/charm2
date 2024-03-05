@@ -16,7 +16,7 @@ Assumptions:
 We define the to-be-inferred signal as 
 
 $$
-s(x):=\mathrm{log} \bigg( \hat{\rho}(x)):=\mathrm{log}(\frac{\rho (x)}{\[\rho\](x)} \bigg) ,
+s(x):=\mathrm{log} \hat{\rho}(x) ):=\mathrm{log} \bigg(\frac{\rho (x)}{\[\rho\](x)} \bigg) ,
 $$
 
 where $x$ is the redshift magnitude $x:=-\mathrm{log}(a)$.
