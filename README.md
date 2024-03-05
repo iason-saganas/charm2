@@ -11,7 +11,7 @@ Assumptions:
   there exists eras of the universe, each dominated by a different
   energy component
 - The different energy components evolve according to an equation of state in
-  terms of the scale factor $a$: $\rho_i(a)\propot a^{-3(1+w_i)}$ 
+  terms of the scale factor $a$: $\rho_i(a)\propto a^{-3(1+w_i)}$ 
 
 We define the to-be-inferred signal as 
 
