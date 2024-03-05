@@ -6,16 +6,61 @@ type Ia.
 
 Assumptions: 
 - Friedmannian Cosmology
-- The energy density parameters $\Omega$
+- The energy density parameters $\Omega_i$ of different
+  (unknown) matter contributions of the universe evolve such that
+  there exists eras of the universe, each dominated by a different
+  energy component
+- The different energy components evolve according to an equation of state in
+  terms of the scale factor $a$: $\rho_i(a)\propot a^{-3(1+w_i)}$ 
 
+We define the to-be-inferred signal as 
 
-without assuming a specific type of matter distribution in the Universe. Data are distance moduli and
-redshifts from Supernovae Ia from the 
+$$
+s(x):=\mathrm{log}(\hat{\rho}(x)):=\mathrm{log}(\frac{\rho (x)}{\[\rho\](x)}),
+$$
+
+where $x$ is the redshift magnitude $x:=-\mathrm{log}(a)$.
+
+We use the first Friedmann-Equation to specify specify the relationship
+between the signal and the so-called signal response $R(s)$. 
+The signal response is:
+
+$$
+R(s) = 5\mathrm{log}_10 (e^x  \mathcal{K} \int_0^x e^{-\frac{1}{2}\tilde{x}+\tilde{x}}\hspace{1mm} \mathrm{d}\tilde{x}) - 5,
+$$
+
+where the constant $\mathcal{K}$ is 
+
+$$
+\mathcal{K}:= (\frac{8\pi G}{3\[G\]})^{-\frac{1}{2}}\cdot \frac{c}{\[c\]}
+$$
+
+The relationship between the signal and the expansion rate of the universe as encoded in 
+the Hubble Parameter $H(z)$ is: 
+
+$$
+
+$$
+
+We use `NIFTy8` (**N**umerical **I**nformation **F**ield **T**heor**y**) to perform 
+Bayesian Variational Inference (VI) of the specified signal via its inference engines 
+`geoVI` (**G**eometric **V**I) and its first order, linear approximation, 
+`MGVI` (**M**etric **G**aussian **V**I).
+
+Our reconstruction is agnostic; No physical model of the early and late universe
+expansion is assumed. Bayes' Theorem acts to "fill in" the gaps in the data.
+
+Our reconstruction is non-parametric; Smoothness is controlled the signal correlation
+$S$ that can be constrained from the cosmological principle.
+
+A pseudo Gaussian Process is used to model all further behaviour of the signal
+correlation $S$ (e.g. smoothness and slope of power-spectrum on a log-log scale and 
+deviations thereof).
+
+The data we use are distance moduli of Supernovae Ia from the 
 [Union2.1](https://supernova.lbl.gov/Union/) compilation and [Pantheon+](https://pantheonplussh0es.github.io) Analysis.
 
-Powered by [NIFTy](https://ift.pages.mpcdf.de/nifty/user/installation.html) (v8). 
-
-Original [CHARM](https://gitlab.mpcdf.mpg.de/natalia/charm) by [Natalia Porqueres et al. 2017](https://arxiv.org/abs/1608.04007) + geoVI instead of an iterative MAP approach.
+This is an update to the original [`Charm`](https://gitlab.mpcdf.mpg.de/natalia/charm)-Code by [Natalia Porqueres et al. 2017](https://arxiv.org/abs/1608.04007).
 
 
 Requirements
