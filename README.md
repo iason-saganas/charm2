@@ -16,7 +16,7 @@ Assumptions:
 We define the to-be-inferred signal as 
 
 $$
-s(x):=\mathrm{log} \hat{\rho}(x) ):=\mathrm{log} \bigg(\frac{\rho (x)}{\[\rho\](x)} \bigg) ,
+s(x):=\mathrm{log} (\hat{\rho}(x) ):=\mathrm{log} \bigg(\frac{\rho (x)}{\[\rho(x) \]} \bigg) ,
 $$
 
 where $x$ is the redshift magnitude $x:=-\mathrm{log}(a)$.
@@ -36,10 +36,10 @@ $$
 $$
 
 The relationship between the signal and the expansion rate of the universe as encoded in 
-the Hubble Parameter $H(z)$ is: 
+the Hubble Parameter $H(a)$ is: 
 
 $$
-hey
+\frac{H(a)^2}{\[ H(a) \]^2} = \frac{8\pi G}{3\[G\]}\hat{\rho}(a) = \frac{8\pi G}{3\[G\]}e^s
 $$
 
 We use `NIFTy8` (**N**umerical **I**nformation **F**ield **T**heor**y**) to perform 
