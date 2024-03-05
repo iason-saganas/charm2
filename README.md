@@ -1,4 +1,4 @@
-CHARM2.0: Cosmic History Agnostic Reconstruction Method
+CHARM2: Cosmic History Agnostic Reconstruction Method
 =================
 
 Reconstructing cosmic expansion history (cosmic energy density as a function of redshift) from Supernovae
