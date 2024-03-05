@@ -16,7 +16,7 @@ Assumptions:
 We define the to-be-inferred signal as 
 
 $$
-s(x):=\mathrm{log}(\hat{\rho}(x)):=\mathrm{log}(\frac{\rho (x)}{\[\rho\](x)}),
+s(x):=\mathrm{log} \bigg( \hat{\rho}(x)):=\mathrm{log}(\frac{\rho (x)}{\[\rho\](x)} \bigg) ,
 $$
 
 where $x$ is the redshift magnitude $x:=-\mathrm{log}(a)$.
@@ -26,20 +26,20 @@ between the signal and the so-called signal response $R(s)$.
 The signal response is:
 
 $$
-R(s) = 5\mathrm{log}_10 (e^x  \mathcal{K} \int_0^x e^{-\frac{1}{2}\tilde{x}+\tilde{x}}\hspace{1mm} \mathrm{d}\tilde{x}) - 5,
+R(s) = 5\mathrm{log}_{10} \bigg(e^x  \mathcal{K} \int_0^x e^{-\frac{1}{2}\tilde{x}+\tilde{x}}\hspace{1mm} \mathrm{d}\tilde{x} \bigg) - 5,
 $$
 
 where the constant $\mathcal{K}$ is 
 
 $$
-\mathcal{K}:= (\frac{8\pi G}{3\[G\]})^{-\frac{1}{2}}\cdot \frac{c}{\[c\]}
+\mathcal{K}:= \bigg( \frac{8\pi G}{3\[G\]} \bigg)^{-\frac{1}{2}}\cdot \frac{c}{\[c\]}
 $$
 
 The relationship between the signal and the expansion rate of the universe as encoded in 
 the Hubble Parameter $H(z)$ is: 
 
 $$
-
+hey
 $$
 
 We use `NIFTy8` (**N**umerical **I**nformation **F**ield **T**heor**y**) to perform 
