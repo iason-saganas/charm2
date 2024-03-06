@@ -26,7 +26,7 @@ between the signal and the so-called signal response $R(s)$.
 The signal response is:
 
 $$
-R(s) = 5\mathrm{log}_{10} \bigg(e^x  \mathcal{K} \int_0^x e^{-\frac{1}{2}\tilde{x}+\tilde{x}}\hspace{1mm} \mathrm{d}\tilde{x} \bigg) - 5,
+R(s) = 5\mathrm{log}_{10} \bigg(e^x  \mathcal{K} \int_0^x e^{-\frac{1}{2}s(\tilde{x})+\tilde{x}}\hspace{1mm} \mathrm{d}\tilde{x} \bigg) - 5,
 $$
 
 where the constant $\mathcal{K}$ is 
