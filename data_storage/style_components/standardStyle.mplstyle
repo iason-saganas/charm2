@@ -8,8 +8,7 @@ axes.labelsize: 16      # Axis label font size
 axes.grid: False         # Whether to show grid lines
 
 # Lines
-lines.linewidth: 2      # Line width
-lines.marker: o         # Marker style
+lines.marker: .         # Marker style
 lines.markersize: 8     # Marker size
 lines.color: blue       # Line color
 
