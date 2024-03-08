@@ -2,8 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from data_storage.style_components.matplotlib_style import *
-from setup import *
+from setup_synthetic import *
 
+# ToDo: Construct random fields that are what we expect from the signal field and show through 100 or 1000 simulations
+#  our algorithm can reconstruct the signal!
 # Construct ground truth
 ground_truth_cf = ift.from_random(s.domain, random_type='normal', mean=-1, std=.05)  # The ground truth correlated field (MultiField).
 ground_truth_signal = s(ground_truth_cf)  # The ground truth signal field by applying the signal model (cf, _OpChain)
@@ -16,7 +18,7 @@ plot_all_synthetic_pre_kl(x.field().val, ground_truth_signal.val,
                           np.log(ground_truth_power_spectrum.val[1:int(n_pix)]), d.val, neg_a_mag)
 
 likelihood_energy = ift.GaussianEnergy(d, N.inverse) @ R
-global_iterations = 15
+global_iterations = 6
 
 posterior_samples = ift.optimize_kl(likelihood_energy=likelihood_energy,
                                     total_iterations=global_iterations,

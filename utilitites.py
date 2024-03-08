@@ -11,9 +11,13 @@ from nifty8.operators.operator import _OpChain
 from nifty8.domains.unstructured_domain import UnstructuredDomain
 import matplotlib.pyplot as plt
 from data_storage.style_components.matplotlib_style import *
+import pandas as pd
+from nifty8.operators.matrix_product_operator import MatrixProductOperator
+import warnings
 
 __all__ = ['create_plot_1', 'CustomRGSpace', 'unidirectional_radial_los', 'build_response', 'plot_all_synthetic_pre_kl',
-           'kl_sampling_rate', 'plot_all_synthetic_post_kl']
+           'kl_sampling_rate', 'plot_all_synthetic_post_kl', 'read_data_union', 'read_data_pantheon',
+           'CovarianceMatrix', 'raise_warning']
 
 
 class CustomRGSpace(RGSpace):
@@ -182,4 +186,127 @@ def kl_sampling_rate(index: int):
     if index < 5:
         return 5
     else:
-        return 50
+        return 15
+
+
+def read_data_union():
+    path_to_data = 'data_storage/raw_data/Union_2_1_data.txt'
+    path_to_cov = 'data_storage/raw_data/Union2_1_Cov-syst.txt'
+    z = np.loadtxt(path_to_data, usecols=[1], dtype=float)  # read data
+    sorting_indices = np.argsort(z)  # get sorting indices (from smallest to biggest), s.t. mu can be sorted in that
+    # order as well
+    z = z[sorting_indices]  # sort from smallest to biggest
+    mu = np.loadtxt(path_to_data, usecols=[2], dtype=float)[sorting_indices]
+    covariance = np.loadtxt(path_to_cov, dtype=float)
+    return z, mu, covariance
+
+
+def read_data_pantheon():
+    path_to_data = 'data_storage/raw_data/Pantheon+SH0ES.csv'
+    path_to_cov = 'data_storage/raw_data/Pantheon+SH0ES_STAT+SYS.txt'
+
+    required_fields = ["zHEL", "MU_SH0ES"]
+    df = pd.read_csv(path_to_data, sep=" ", skipinitialspace=True, usecols=required_fields)
+    z = np.array(df.zHEL)
+    mu = np.array(df.MU_SH0ES)
+
+    df = pd.read_table(path_to_cov)
+    arr = np.array(df["1701"])  # first line corresponds to '1701' = length of data array
+    covariance = arr.reshape(1701, 1701)
+
+    return z, mu, covariance
+
+
+def spectral_decompose(matrix: np.ndarray, tol: float) -> Tuple:
+    """
+    Let 'matrix' be A, a strictly positive, symmetric matrix. Then, it has a decomposition via the spectral
+    theorem:
+
+        A = U D U^†
+
+    Here, D = diag(λ_1, λ_2,...λ_n) the diagonal matrix containing the spectral values and Λ the unitary
+    transformation matrix containing the eigenvectors.
+    This function checks for positivity and symmetry and returns the triple U, D, U^†.
+
+    @param matrix: np.ndarray, The matrix to be decomposed.
+    @param tol: float, The absolute tolerance to sanity check the symmetry and recomposition of the decomposed matrix.
+
+    :return: U D U^†, tuple, The decomposition
+    """
+    # Note that here, we use 'np.linalg.eigh' which is a routine explictly for symmetric matrices.
+    A = np.array(matrix)
+    B = A.T
+
+    # print("Decimals after the comma, A: ", str(A[0, 1]).split(".")[1])
+    # print("Decimals after the comma, A.T: ", str(B[0, 1]).split(".")[1])
+
+    if not np.allclose(A, B, atol=tol, rtol=0):
+        raise ValueError("Won't spectral decompose non symmetric matrix.")
+    rows, columns = A.shape
+    if rows != columns:
+        raise ValueError("Matrix to spectral decompose is not square.")
+    lambdas, U = np.linalg.eigh(A)
+    if np.any(lambdas < 0):
+        raise ValueError("Matrix is not positive definite.")
+    D = np.diag(lambdas)
+    U_inv = np.linalg.inv(U)  # Since U is unitary, U^† = U^{-1}
+    sanity_check = np.allclose(A, U @ D @ U_inv, atol=tol, rtol=0)
+    if not sanity_check:
+        raise ValueError("Something went wrong during the diagonalization process.")
+    return U, D, U_inv
+
+
+class CovarianceMatrix(MatrixProductOperator):
+    """
+    The same as 'MatrixProductOperator' but has an additional argument 'sampling_dtype' which is needed to sample from
+    this operator if it is used in a likelihood and also provides two additional functionalities:
+
+    N = CustomMatrixProductOperator(some_domain, some_matrix)
+    N.inverse provides the inverted matrix
+
+    Furthermore, 'tol' needs to be provided, which is the absolute tolerance used for sanity checking the symmetry
+    of the matrix and its eigen-decomposition and other operations.
+
+    """
+    def __init__(self, domain, matrix, tol, spaces=None, flatten=False, sampling_dtype=None):
+        super().__init__(domain, matrix, spaces=spaces, flatten=flatten)
+        self._dtype = sampling_dtype
+        self.tol = tol
+        self.mtrx_sqrt = self.get_fct()
+
+    @property
+    def inverse(self):
+        # Return N^{-1}, such that N^{-1} @ N ~ 1. The off-diagonal elements are of the order 10e-18 -> 10e-20.
+        return np.linalg.inv(self._mat)
+
+    def get_fct(self):
+        print("get_fct called. Should only appear once.")
+        """
+        Let self._mat = N.
+        Let N.inverse = N^{-1} be a strictly positive, symmetric matrix. Then, it has a unique matrix square root via
+        the spectral theorem:
+
+            √N^{-1} = U √D U^†,
+
+        where √D:=diag(√λ_1, √λ_2, ..., √λ_n). This method calls the function 'spectral_decompose' (which checks for
+        positivity and symmetry) and returns the inverse covariance matrix square root √N^{-1}.
+        """
+        N_inv = self.inverse
+        U, D, U_inv = spectral_decompose(N_inv, tol=self.tol)
+        square_root = U @ np.sqrt(D) @ U_inv
+        sanity_check = np.allclose(N_inv, square_root @ square_root, atol=self.tol, rtol=0)
+        if not sanity_check:
+            raise ValueError("Inverse covariance matrix is not approximately equal to the square of its"
+                             "square root decomposition.")
+        return square_root
+
+    def get_sqrt(self):
+        """
+        Returns the matrix square root √N^{-1} as new 'MatrixProductOperator'.
+        """
+        return MatrixProductOperator(self._domain, self.mtrx_sqrt)
+
+
+def raise_warning(message):
+    warnings.warn(message, category=Warning)
+
