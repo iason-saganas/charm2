@@ -14,39 +14,64 @@ import nifty8 as ift
 # Define iteration and minimization control
 
 config = {
-    'Signal Field Resolution': 8000,
-    'Length of signal space': 3,  # See comment in documentation of 'CustomRGSpace'.
+    'Signal Field Resolution': 1024,  # 2**10 for the FFT
+    'Length of signal space': 1,
+    'Factor to extend signal space size by': 6,
     # 'Run Inference with Union2.1 data': True,
     # 'Run Inference with Pantheon+ data': False,
 }
 
-n_pix, x_length = [float(setting) for setting in config.values()]
-z, mu, covariance = read_data_pantheon()
+n_pix, x_length, x_fac = [int(setting) for setting in config.values()]
+z, mu, covariance = read_data_union()
 n_dp = len(z)
 
-x = CustomRGSpace(n_pix, distances=x_length / n_pix)  # The Signal space.
+pxl_size = x_length / n_pix
+x = ift.RGSpace(n_pix, distances=pxl_size)  # The signal space.
+x_ext = ift.RGSpace(x_fac * n_pix, distances=x_fac*pxl_size)  # An extended signal space.
 data_space = ift.UnstructuredDomain((n_dp,))
+x = attach_custom_field_method(x)  # Attach the `field` method
+x_ext = attach_custom_field_method(x_ext)  # Attach the `field` method
 
 neg_a_mag = np.log(1+z)  # The negative scale factor magnitude, x = -log(a) = log(1+z)
 
 args = {
-    'offset_mean': 0,
+    'offset_mean': 30,
     'offset_std': None,
-    'fluctuations': (1, 1e-16),
-    'loglogavgslope': (-4, 1e-16),
+    'fluctuations': (0.6, 0.1),
+    'loglogavgslope': (-4, 0.5),
     'asperity': None,
     'flexibility': None,
 }
 
-s = ift.SimpleCorrelatedField(target=x, **args)  # The to-be-inferred signal
+X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
 
-# Build the signal response and noise operator
-R = build_response(signal_space=x, signal=s, data_space=data_space, neg_scale_factor_mag=neg_a_mag)
+alpha = ift.NormalTransform(mean=2, sigma=3, key="alpha")
+beta = ift.NormalTransform(mean=0, sigma=3, key="beta")
+
+contraction = ift.ContractionOperator(domain=x, spaces=None)
+alpha = contraction.adjoint @ alpha
+beta = contraction.adjoint @ beta
+x_op = ift.DiagonalOperator(diagonal=x.field())
+line_model = x_op @ alpha + beta
+line_model_ext = X @ line_model
+
+s = ift.SimpleCorrelatedField(target=x_ext, **args) + line_model_ext # The to-be-inferred signal on the extended domain
+cf_parameters = str(args.values())
+
+# ift.plot_priorsamples(line_model)
+
+# Build the signal response, noise operator, data field and others
+R = build_response(signal_space=x, signal=X.adjoint(s), data_space=data_space, neg_scale_factor_mag=neg_a_mag)
 N = CovarianceMatrix(domain=data_space, matrix=covariance, sampling_dtype=np.float64, tol=1e-4)
+d = ift.Field(domain=ift.DomainTuple.make(data_space,), val=mu)
 
+plot_op = ift.DomainChangerAndReshaper(domain=R.target, target=ift.DomainTuple.make(ift.RGSpace(R.target.shape)))
+
+# ift.plot_priorsamples(s)
+# ift.plot_priorsamples(plot_op @  R)
 
 # Iteration control for `MGVI` and linear parts of the inference
-ic_sampling_lin = ift.AbsDeltaEnergyController(name="Precise linear sampling", deltaE=0.05, iteration_limit=100)
+ic_sampling_lin = ift.AbsDeltaEnergyController(name="Precise linear sampling", deltaE=0.02, iteration_limit=100)
 
 # Iteration control for `geoVI`
 ic_sampling_nl = ift.AbsDeltaEnergyController(name="Coarser, nonlinear sampling", deltaE=0.5, iteration_limit=20,
@@ -55,9 +80,12 @@ ic_sampling_nl = ift.AbsDeltaEnergyController(name="Coarser, nonlinear sampling"
 geoVI_sampling_minimizer = ift.NewtonCG(ic_sampling_nl)
 
 # KL Minimizer control, the same energy criterion as the geoVI iteration control, but more iteration steps
-ic_newton = ift.AbsDeltaEnergyController(name='Newton Descent Finder', deltaE=0.5, convergence_level=2,
+ic_newton = ift.AbsDeltaEnergyController(name='Newton Descent Finder', deltaE=0.1, convergence_level=2,
                                          iteration_limit=35)
 descent_finder = ift.NewtonCG(ic_newton)
 
 raise_warning("\nUnion2.1 covariance matrix is only symmetric up to a factor of 10^{-10}.\n"
-              "Pantheon+ covariance matrix is only symmetric up to a factor of 10^{-4}.")
+              "Pantheon+ covariance matrix is only symmetric up to a factor of 10^{-4}.\n\n")
+
+# ToDo: Please delete these following lines in the future.
+
