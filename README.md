@@ -121,11 +121,4 @@ of data, posterior, power spectrum etc. should be shown via `plt.show()` or save
 
 ### Elements of time
 
->Runtime synthetic data $\approx 3-5 \hspace{1mm}$ min
-> 
->Runtime Union2.1 data $\approx 40-60 \hspace{1mm}$ min
-> 
->Runtime Pantheon+ data $\approx 10-15 \hspace{1mm}$ hrs
-
-
 
