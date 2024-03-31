@@ -1,27 +1,22 @@
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-from data_storage.style_components.matplotlib_style import *
 from setup_synthetic import *
+from setup_cosmological import z_p
+from setup_cosmological import mu_u, mu_p
 
-# ToDo: Construct random fields that are what we expect from the signal field and show through 100 or 1000 simulations
-#  our algorithm can reconstruct the signal!
-# Construct ground truth
-ground_truth_cf = ift.from_random(s.domain, random_type='normal', mean=-1, std=.05)  # The ground truth correlated field
-# (MultiField).
+# Construct random ground truth domain field
+ground_truth_model = ift.from_random(s_g.domain)
+# Construct ground truth field
+ground_truth_field = s_g(ground_truth_model)
+# Construct synthetic data
+d = R_g(ground_truth_model) + N.draw_sample()
 
-ground_truth_signal = s(ground_truth_cf)  # The ground truth signal field by applying the signal model (cf, _OpChain)
-# onto the ground truth correlated field position.
-ground_truth_power_spectrum = s.power_spectrum.force(ground_truth_cf)
-d = R(ground_truth_cf) + N.draw_sample()
-
-# Plot signal field and power spectrum ground truth, as well as data realizations
-plot_all_synthetic_pre_kl(x_ext.field().val, ground_truth_signal.val,
-                          np.log(ground_truth_power_spectrum.val[1:int(n_pix)]), d.val, neg_a_mag)
+# Plot signal field ground truth, as well as data realizations
+plot_synthetic_ground_truth(x=x, ground_truth=X.adjoint(ground_truth_field).val, x_max_pn=np.max(np.log(1+z_p)))
+plot_synthetic_data(neg_scale_fac_mag=neg_a_mag, data=d.val, x_max_pn=np.max(np.log(1+z_p)),
+                    mu_arrays=np.concatenate((mu_p, mu_u)))
 
 likelihood_energy = ift.GaussianEnergy(d, N.inverse) @ R
 global_iterations = 6
-
+"""
 posterior_samples = ift.optimize_kl(likelihood_energy=likelihood_energy,
                                     total_iterations=global_iterations,
                                     n_samples=kl_sampling_rate,
@@ -29,14 +24,16 @@ posterior_samples = ift.optimize_kl(likelihood_energy=likelihood_energy,
                                     sampling_iteration_controller=ic_sampling_lin,
                                     nonlinear_sampling_minimizer=geoVI_sampling_minimizer,
                                     output_directory=None,
-                                    return_final_position=True)
+                                    return_final_position=False)
 
-# ToDo: What exactly is 'posterior_realizations_list'? Are these the initial 'bad' samples as well? In that case the
-#  quality of the signal mean would be weighed down. Shouldn't just 'last_position_cf'  be used?
-posterior_realizations_list, last_position_cf = posterior_samples
+# Save the inference run
+pickle_me_this(f"synthetic/{arguments}", posterior_samples)
+"""
+# Unpickle the last inference run
+posterior_samples = unpickle_me_this("synthetic/cfm_{'offset_mean': 0, 'offset_std': None, 'fluctuations': (1.8, 1.8), 'loglogavgslope': (-4, 1e-16), 'asperity': None, 'flexibility': None}_lm_{'slope': (2, 5), 'intercept': (30, 5)}.pickle")
 
-# ToDo: Calculate p_s_var from all power spectra (see old Charm2 versions)
+posterior_realizations_list = posterior_samples
 s_mean, s_var = posterior_realizations_list.sample_stat(s)
-p_s_mean = posterior_realizations_list.average(s.power_spectrum)
 
-plot_all_synthetic_post_kl(x_ext.field().val, s_mean.val, np.sqrt(s_var.val), ground_truth_signal.val, neg_a_mag)
+plot_synthetic_ground_truth(x=x, ground_truth=X.adjoint(ground_truth_field).val, x_max_pn=np.max(np.log(1+z_p)),
+                            reconstruction=(X.adjoint(s_mean).val, np.sqrt(X.adjoint(s_var).val)))
