@@ -1,5 +1,5 @@
 import numpy as np
-from utilitites import *
+from .utilitites import *
 import nifty8 as ift
 
 # Defining necessary spaces, fields and operators:

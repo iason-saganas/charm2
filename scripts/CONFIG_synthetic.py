@@ -1,5 +1,5 @@
 import nifty8 as ift
-from utilitites import *
+from .utilitites import *
 import numpy as np
 
 # Defining necessary spaces, fields and operators:
@@ -51,7 +51,7 @@ X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
 
 # The to-be-inferred signal on the extended domain
 s = ift.SimpleCorrelatedField(target=x_ext, **args_cfm) + LineModel(target=x_ext, args=args_lm)
-ift.plot_priorsamples(s)
+# ift.plot_priorsamples(s)
 # The ground truth model
 s_g = PiecewiseLinear(signal_space=x_ext, omega_m_custom=0.3, omega_l_custom=2)
 

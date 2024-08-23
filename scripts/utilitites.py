@@ -21,6 +21,8 @@ import pickle
 from nifty8.sugar import plot_priorsamples, from_random
 from nifty8.utilities import lognormal_moments
 import gzip
+import os
+import shutil
 
 __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_sampling_rate', 'read_data_union',
            'read_data_pantheon', 'CovarianceMatrix', 'raise_warning', 'build_flat_lcdm', 'pickle_me_this',
@@ -435,19 +437,19 @@ def build_charm1_agnostic(mode="union2.1"):
     :param mode: str,       One of 'union2.1' or 'pantheon+'.
     """
     if mode == "union2.1":
-        path_to_x = "data_storage/raw_data/x_field_charm1_union2_1.txt"
-        path_to_s = "data_storage/raw_data/s_field_charm1_union2_1.txt"
-        path_to_D = r"data_storage/raw_data/D_field_charm1_union2_1.txt"
+        path_to_x = "../data_storage/raw_data/x_field_charm1_union2_1.txt"
+        path_to_s = "../data_storage/raw_data/s_field_charm1_union2_1.txt"
+        path_to_D = r"../data_storage/raw_data/D_field_charm1_union2_1.txt"
         correction_offset = 0.0246747  # log(rho/rho0) in charm1 is not precisely at 0, which must be incorrect
     elif mode == "pantheon+":
-        path_to_x = "data_storage/raw_data/x_field_charm1_pantheon+.txt"
-        path_to_s = "data_storage/raw_data/s_field_charm1_pantheon+.txt"
-        path_to_D = r"data_storage/raw_data/D_field_charm1_pantheon+.txt"
+        path_to_x = "../data_storage/raw_data/x_field_charm1_pantheon+.txt"
+        path_to_s = "../data_storage/raw_data/s_field_charm1_pantheon+.txt"
+        path_to_D = r"../data_storage/raw_data/D_field_charm1_pantheon+.txt"
         correction_offset = 0.10272  # log(rho/rho0) in charm1 is not precisely at 0, which must be incorrect
     elif mode == "pantheon+_reformulated":
-        path_to_x = "data_storage/raw_data/charm1_reformulated/x_field_charm1_pantheon+.txt"
-        path_to_s = "data_storage/raw_data/charm1_reformulated/s_field_charm1_pantheon+.txt"
-        path_to_D = r"data_storage/raw_data/charm1_reformulated/D_field_charm1_pantheon+.txt"
+        path_to_x = "../data_storage/raw_data/charm1_reformulated/x_field_charm1_pantheon+.txt"
+        path_to_s = "../data_storage/raw_data/charm1_reformulated/s_field_charm1_pantheon+.txt"
+        path_to_D = r"../data_storage/raw_data/charm1_reformulated/D_field_charm1_pantheon+.txt"
     else:
         raise ValueError("Unrecognized mode in `build_charm1_agnostic`.")
 
@@ -577,6 +579,60 @@ def unpickle_me_this(filename: str, absolute_path=False):
     data = pickle.load(file)
     file.close()
     return data
+
+
+def store_meta_data(datetime_obj, duration_of_inference, len_d, inference_type):
+    """
+    Stores metadata related to an inference run in a text file and manages associated data files.
+
+    This function creates a metadata file named using the current date and time. The file contains
+    details about the inference run, including the type of data used, the length of the dataset, and
+    the duration of the inference in minutes. The function also appends the content of additional files
+    located in a temporary directory to the metadata file, then moves the metadata file to a specified
+    directory and deletes the temporary directory.
+
+    Args:
+        datetime_obj (datetime): The datetime object representing when the inference run occurred.
+        duration_of_inference (float): The duration of the inference in seconds.
+        len_d (int): The length of the dataset used for the inference.
+        inference_type (str): A string indicating the type of inference ('synthetic' or 'real').
+
+    """
+    # Create file name with datetime
+    timestamp = datetime_obj.strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"metadata_{timestamp}.txt"
+
+    # Convert duration from seconds to minutes
+    duration_minutes = duration_of_inference / 60
+
+    # Define paths
+    temp_dir = 'data_storage/pickled_inferences/temp'
+    final_dir = f'data_storage/pickled_inferences/{inference_type}'
+
+    # Ensure final directory exists
+    os.makedirs(final_dir, exist_ok=True)
+
+    # Create the metadata file
+    with open(filename, 'w') as file:
+        file.write(f"Charm2 inference run on {timestamp}. Mode: {inference_type}\n")
+        file.write(f"Length of dataset: {len_d}\n")
+        file.write(f"Time took in minutes: {duration_minutes:.2f}\n\n")
+
+        # Append contents of the other files
+        for additional_file in ['counting_report', 'minisanity.txt']:
+            additional_file_path = os.path.join(temp_dir, additional_file)
+            if os.path.exists(additional_file_path):
+                with open(additional_file_path, 'r') as afile:
+                    file.write(afile.read())
+                file.write("\n\n")  # Add line breaks between sections
+            else:
+                file.write(f"File {additional_file} not found.\n\n")
+
+    # Move the metadata file to the final directory
+    shutil.move(filename, os.path.join(final_dir, filename))
+
+    # Delete the temp directory and its contents
+    shutil.rmtree(temp_dir)
 
 
 def current_expansion_rate(s: np.array, delta_s: np.array = None) -> float:
@@ -1040,7 +1096,6 @@ def draw_hubble_diagrams(show=False, save=False):
     plt.clf()
 
 
-draw_hubble_diagrams(save=True)
-
+# draw_hubble_diagrams(save=True)
 # plot_comparison_fields(plot_fluctuations_scale_visualization=True)
 # plot_lognormal_histogram(mean=.4, sigma=.2, n_samples=10000, vlines=[0.147, 0.14], save=True, show=True)
