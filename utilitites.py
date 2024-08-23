@@ -3,6 +3,7 @@ from nifty8.domain_tuple import DomainTuple
 from nifty8.field import Field
 import numpy as np
 from scipy.constants import c, G
+from scipy.optimize import curve_fit
 from typing import Tuple
 from nifty8.operators.diagonal_operator import DiagonalOperator
 from nifty8.operators.adder import Adder
@@ -10,20 +11,24 @@ from nifty8.library.los_response import LOSResponse
 from nifty8.operators.operator import _OpChain
 from nifty8.domains.unstructured_domain import UnstructuredDomain
 from nifty8.operators.contraction_operator import ContractionOperator
-from nifty8.operators.normal_operators import NormalTransform
+from nifty8.operators.normal_operators import NormalTransform, LognormalTransform
 import matplotlib.pyplot as plt
 from data_storage.style_components.matplotlib_style import *
 import pandas as pd
 from nifty8.operators.matrix_product_operator import MatrixProductOperator
 import warnings
 import pickle
+from nifty8.sugar import plot_priorsamples, from_random
+from nifty8.utilities import lognormal_moments
+import gzip
 
 __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_sampling_rate', 'read_data_union',
            'read_data_pantheon', 'CovarianceMatrix', 'raise_warning', 'build_flat_lcdm', 'pickle_me_this',
            'unpickle_me_this', 'current_expansion_rate', 'attach_custom_field_method', 'chi_square',
            'build_charm1_agnostic', 'plot_comparison_fields', 'show_plot', 'plot_flat_lcdm_fields',
            'plot_charm1_in_comparison_fields', 'LineModel', 'plot_synthetic_ground_truth', 'plot_synthetic_data',
-           'synthetic_ground_model_truth', 'plot_charm2_in_comparison_fields']
+           'PiecewiseLinear', 'plot_charm2_in_comparison_fields', 'plot_prior_distribution', 'LCDM_MODEL',
+           'read_data_des']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -91,17 +96,24 @@ def attach_custom_field_method(space: RGSpace):
     return space
 
 
-def unidirectional_radial_los(n_los: int) -> np.ndarray:
+def unidirectional_radial_los(n_los: int, uniform_drawing=False) -> np.ndarray:
     """
     Generates an ordered array of normally distributed random numbers. Returns that array ('ends') and the 'starts'
     array (zeroes). Represents synthetic redshifts.
-    :param n_los:   int,                                    Number of lines-of-sight to construct.
-    :return: ends: np.array,                                The synthetic lines-of-sight.
+    :param uniform_drawing:     If true, draws from distributes the data uniformly over redshift space and doesnt
+                                normalize the data.
+                                If false, draws more realistically from a lognormal distribution.
+    :param n_los:   int,        Number of lines-of-sight to construct.
+    :return: ends: np.array,    The synthetic lines-of-sight.
     """
     n_los = int(n_los)
-    arr = np.random.lognormal(mean=0, sigma=1, size=n_los)
-    maximum = np.max(arr)
-    ends = np.sort(arr / maximum)
+    if uniform_drawing:
+        arr = 2*np.random.rand(n_los)
+        ends = np.sort(arr)
+    else:
+        arr = np.random.lognormal(mean=0, sigma=1, size=n_los)
+        maximum = np.max(arr)
+        ends = np.sort(arr / maximum)
     return ends
 
 
@@ -192,13 +204,20 @@ def kl_sampling_rate(index: int):
     :param index:
     :return:
     """
-    if index < 5:
-        return 5
+    if index < 2:
+        return 7
     else:
         return 15
 
 
 def read_data_union():
+    """
+    Source: `https://supernova.lbl.gov/Union/figures/SCPUnion2.1_mu_vs_z.txt`
+    The data is not ordered but will be after this function is called.
+    Note how on reordering of the data, the covariance matrix must be reordered as well.
+    :return:
+    """
+    print("\nReading Union2.1 data...")
     path_to_data = 'data_storage/raw_data/Union_2_1_data.txt'
     path_to_cov = 'data_storage/raw_data/Union2_1_Cov-syst.txt'
     z = np.loadtxt(path_to_data, usecols=[1], dtype=float)  # read data
@@ -207,6 +226,8 @@ def read_data_union():
     z = z[sorting_indices]  # sort from smallest to biggest
     mu = np.loadtxt(path_to_data, usecols=[2], dtype=float)[sorting_indices]
     covariance = np.loadtxt(path_to_cov, dtype=float)
+    covariance = covariance[sorting_indices][:, sorting_indices]  # Reorder!
+    print("\tFinished")
     return z, mu, covariance
 
 
@@ -214,8 +235,10 @@ def read_data_pantheon():
     """
     Source: https://github.com/PantheonPlusSH0ES/DataRelease/tree/main/Pantheon%2B_Data/4_DISTANCES_AND_COVAR
     `zHD` is the Hubble Diagram redshift, including CMB and peculiar velocity corrections.
+    The data is already ordered in ascending order.
     :return:
     """
+    print("\nReading Pantheon+ data...")
     path_to_data = 'data_storage/raw_data/Pantheon+SH0ES.csv'
     path_to_cov = 'data_storage/raw_data/Pantheon+SH0ES_STAT+SYS.txt'
 
@@ -227,7 +250,57 @@ def read_data_pantheon():
     df = pd.read_table(path_to_cov)
     arr = np.array(df["1701"])  # the first line corresponds to '1701' = length of the data array
     covariance = arr.reshape(1701, 1701)
+    print("\tFinished")
     return z, mu, covariance
+
+
+def read_data_des():
+    """
+    Copied from DES-SN5YR file `SN_only_cosmosis_likelihood.py` from GitHub.
+    See comment at the end of the page of `https://github.com/des-science/DES-SN5YR/tree/main/4_DISTANCES_COVMAT`.
+    """
+    print("\nReading DESY5 data...")
+    filename = "data_storage/raw_data/DES-SN5YR_HD.csv"
+    data = pd.read_csv(filename, delimiter=",", comment='#')
+    # The only columns that we actually need here are the redshift,
+    # distance modulus and distance modulus error
+
+    ww = (data['zHD'] > 0.00)
+    # use the vpec corrected redshift for zCMB
+    zCMB = data['zHD'][ww]
+    # distance modulus and relative stat uncertainties
+    mu_obs = data['MU'][ww]
+    mu_obs_err = data['MUERR_FINAL'][ww]
+
+    filename = "data_storage/raw_data/DES-SN5YR-STAT+SYS.txt.gz"
+    # This data file is just the systematic component of the covariance -
+    # we also need to add in the statistical error on the magnitudes
+    # that we loaded earlier
+    with gzip.open(filename, "rt") as f:
+        line = f.readline()
+        n = int(line)
+        cov_mat = np.zeros((n, n))
+        for i in range(n):
+            for j in range(n):
+                cov_mat[i, j] = float(f.readline())
+
+    # Now add in the statistical error to the diagonal
+    for i in range(n):
+        cov_mat[i, i] += mu_obs_err[i] ** 2
+    f.close()
+
+    cov_mat = cov_mat[ww][:, ww]
+
+    # Finally, reorder:
+    zCMB = zCMB.values
+    mu_obs = mu_obs.values
+
+    ordering_indices = np.argsort(zCMB)
+    zCMB = zCMB[ordering_indices]
+    mu_obs = mu_obs[ordering_indices]
+    cov_mat = cov_mat[ordering_indices][:, ordering_indices]
+    print("\tFinished")
+    return zCMB, mu_obs, cov_mat
 
 
 def spectral_decompose(matrix: np.ndarray, tol: float) -> Tuple:
@@ -312,11 +385,11 @@ class CovarianceMatrix(MatrixProductOperator):
 
         where √D:=diag(√λ_1, √λ_2, ..., √λ_n). This method calls the function 'spectral_decompose' (which checks for
         positivity and symmetry) and returns matrix square root √A.
-        
-        After having called N.inverse in the likelihood, a new Covariance Matrix is returned that represents the 
-        inverse N^{-1} of the original covariance matrix N. In that case, `NIFTy` calls the get_sqrt() method of 
+
+        After having called N.inverse in the likelihood, a new Covariance Matrix is returned that represents the
+        inverse N^{-1} of the original covariance matrix N. In that case, `NIFTy` calls the get_sqrt() method of
         the N^{-1} operator, i.e. it returns  √N^{-1}.
-        
+
         """
         if not self.enable_transformation:
             raise ValueError("Can't get factor of Covariance matrix, `enable_transformation` is set to False.")
@@ -371,17 +444,28 @@ def build_charm1_agnostic(mode="union2.1"):
         path_to_s = "data_storage/raw_data/s_field_charm1_pantheon+.txt"
         path_to_D = r"data_storage/raw_data/D_field_charm1_pantheon+.txt"
         correction_offset = 0.10272  # log(rho/rho0) in charm1 is not precisely at 0, which must be incorrect
+    elif mode == "pantheon+_reformulated":
+        path_to_x = "data_storage/raw_data/charm1_reformulated/x_field_charm1_pantheon+.txt"
+        path_to_s = "data_storage/raw_data/charm1_reformulated/s_field_charm1_pantheon+.txt"
+        path_to_D = r"data_storage/raw_data/charm1_reformulated/D_field_charm1_pantheon+.txt"
     else:
         raise ValueError("Unrecognized mode in `build_charm1_agnostic`.")
 
-    x = np.loadtxt(path_to_x)
-    s_prime = np.loadtxt(path_to_s) - correction_offset
-    D = np.loadtxt(path_to_D)
+    if mode != "pantheon+_reformulated":
+        x = np.loadtxt(path_to_x)
+        s_prime = np.loadtxt(path_to_s) - correction_offset
+        D = np.loadtxt(path_to_D)
 
-    rho0 = 3 * 68.6 ** 2 / (8 * np.pi * G)
-    s = np.log(rho0 * np.exp(s_prime))
+        rho0 = 3 * 68.6 ** 2 / (8 * np.pi * G)
+        s = np.log(rho0 * np.exp(s_prime))
 
-    s_err = np.sqrt(D)
+        s_err = np.sqrt(D)
+    else:
+        x = np.loadtxt(path_to_x)
+        s = np.loadtxt(path_to_s)
+        D = np.loadtxt(path_to_D)
+        s_err = np.sqrt(D)
+
     return x, s, s_err
 
 
@@ -485,14 +569,17 @@ def pickle_me_this(filename: str, data_to_pickle: object):
     file.close()
 
 
-def unpickle_me_this(filename: str):
-    file = open("data_storage/pickled_inferences/"+filename, 'rb')
+def unpickle_me_this(filename: str, absolute_path=False):
+    if absolute_path:
+        file = open(filename, 'rb')
+    else:
+        file = open("data_storage/pickled_inferences/" + filename, 'rb')
     data = pickle.load(file)
     file.close()
     return data
 
 
-def current_expansion_rate(s: np.array) -> float:
+def current_expansion_rate(s: np.array, delta_s: np.array = None) -> float:
     """
     The relationship between the expansion rate and the signal is:
 
@@ -503,13 +590,23 @@ def current_expansion_rate(s: np.array) -> float:
     H0 / (km/s/Mpc)  = sqrt( 8πG/[G]/3 * e^s0).
 
     The returned value is H0 in km/s/Mpc rounded to two decimal places.
+    If the standard deviation is specified, the Gaussian error of H0 is returned as well.
+    The Gaussian error is calculated as
 
-    :param s: np.array,     The inferred signal according to the definition s:=log(ρ).
+    ΔH0 = ∂H0(s0)/∂s0 • Δs0
+
+    :param s: np.array,         The inferred signal according to the definition s:=log(ρ).
+    :param delta_s: np.array,   The inferred signal uncertainty (standard deviation).
 
     """
     s0 = s[0]
     H0 = np.sqrt(8 * np.pi * G / 3 * np.exp(s0))
-    return np.round(H0, 2)
+    if delta_s is None:
+        return np.round(H0, 2)
+    else:
+        delta_s0 = delta_s[0]
+        delta_H = 1 / 2 * (8 * np.pi * G / 3 * np.exp(s0)) ** (1 / 2) * delta_s0
+        return np.round(H0, 2), np.round(delta_H, 5)
 
 
 def chi_square(vector1, vector2):
@@ -541,9 +638,14 @@ def build_comparison_fields():
     return x_coordinates, cmb, sn
 
 
-def plot_comparison_fields():
+def plot_comparison_fields(plot_fluctuations_scale_visualization=False):
     """
     Adds comparison fields to a plot, but does not show it.
+
+    :param plot_fluctuations_scale_visualization: bool, if true, adds and shows a plot of linear fits to the comparison
+    signal fields, as well as the residuals between said fits and the actual curves.
+    This represents the point-wise fluctuations around the offset the correlated field needs to model.
+    We take thus take the fluctuation parameter to be the square root of the mean squared residuals.
 
     :return: handles: tuple,    A tuple containing three strings, representing x label, y label and title for the plot
                                 that can be fed into the function `show_plot()`.
@@ -552,7 +654,6 @@ def plot_comparison_fields():
     x, x_sparse = x_coordinates
     s_cmb, s_cmb_err, s_cmb_sparse, H0_cmb = cmb
     s_sn, s_sn_err, s_sn_sparse, H0_sn = sn
-
     plt.errorbar(x=x, y=s_cmb, yerr=s_cmb_err, fmt="None",
                  ecolor=(0, 0, 0, 0.1))
     plt.errorbar(x=x, y=s_sn, yerr=s_sn_err, fmt="None",
@@ -569,7 +670,36 @@ def plot_comparison_fields():
     xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
     yl = r"$s(x)$"
     handles = (xl, yl, t)
+    if plot_fluctuations_scale_visualization:
+
+        def linear(arg, m, y0):
+            return m * arg + y0
+
+        popt_sn = curve_fit(linear, x, s_sn)[0]
+        popt_cmb = curve_fit(linear, x, s_cmb)[0]
+
+        linear_fit_line_s_cmb = linear(x, *popt_cmb)
+        linear_fit_line_s_sn = linear(x, *popt_sn)
+
+        square_residuals_s_cmb = (s_cmb - linear_fit_line_s_cmb) ** 2
+        square_residuals_s_sn = (s_sn-linear_fit_line_s_sn)**2
+
+        variance_s_cmb = np.mean(square_residuals_s_cmb)
+        variance_s_sn = np.mean(square_residuals_s_sn)
+
+        plt.plot(x, linear_fit_line_s_cmb, "b-", label="Linear curve fit through $s_{cmb}$ field")
+        plt.plot(x, linear_fit_line_s_sn, "r-", label="Linear curve fit through $s_{sn}$ field")
+        plt.plot(x, square_residuals_s_cmb, "b.",label=r"Square residuals between $s_{cmb}$ and its best fit line")
+        plt.plot(x, square_residuals_s_sn, "r.", label=r"Square residuals between $s_{sn}$ and its best fit line")
+        plt.hlines(variance_s_cmb, 0, 2, color="b", ls="--", label="Mean squared residual (variance) $s_{cmb}$")
+        plt.hlines(variance_s_sn, 0, 2, color="r", ls="--", label="Mean squared residual (variance) $s_{sn}$")
+        print("Real signal std deviation s_cmb vs s_sn: ", np.sqrt(variance_s_cmb), np.sqrt(variance_s_sn))
+        plt.legend()
+        plt.show()
     return handles
+
+
+# plot_comparison_fields()
 
 
 def show_plot(x_lim: tuple = None,
@@ -632,7 +762,7 @@ def plot_flat_lcdm_fields(x_max: float, show: bool = False, save: bool = True):
 
 
 def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, x_max_pn: float, x_max_union: float,
-                                     show: bool = False, save: bool = True,):
+                                     show: bool = False, save: bool = True, ):
     """
     Plots the reconstructed charm1 curve using Union2.1 data into a figure containing CMB and SN comparison fields.
     :param s_err:           The charm2 posterior standard deviation values.
@@ -646,13 +776,15 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
     """
     xl, yl, t = plot_comparison_fields()
     plt.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
-    h0_charm2 = str(current_expansion_rate(s))
+    current_expansion_mean, current_expansion_err = current_expansion_rate(s, s_err)
+    h0_charm2 = str(current_expansion_mean)
+    print("Calculated value of H0: ", current_expansion_mean, " ± ", current_expansion_err)
     if save:
-        filename = "data_storage/figures/charm2_reconstruction_with_comparison_fields_pantheon+_fluct_1_8"
+        filename = "data_storage/figures/charm2_reconstruction_pantheon+_cfm_model_fluct_0_2_0_2_final_maybe"
     else:
         filename = ""
     plt.errorbar(x=x, y=s, yerr=s_err, color=blue, ecolor=light_blue, label=r"\texttt{CHARM2},"
-                                                                            r"Union2.1 data. $\hat{H}_0=" + h0_charm2
+                                                                            r"Pantheon+ data. $\hat{H}_0=" + h0_charm2
                                                                             + "$",
                  markersize=1)
     show_plot(x_lim=(0, x_max_pn), y_lim=(29.5, 32.5), x_label=xl, y_label=yl, title="",
@@ -661,7 +793,8 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
 
 def plot_charm1_in_comparison_fields(x_max_pn: float, x_max_union: float, show: bool = False, save: bool = True):
     """
-    Plots the reconstructed charm1 curve using Union2.1 data into a figure containing CMB and SN comparison fields.
+    Plots the reconstructed charm1 curve using Union2.1 or Pantheon+ data into a figure containing CMB and SN
+    comparison fields.
     :param save:
     :param x_max_union:     A vertical line is plotted at this point, indicating the end of the dataset.
     :param x_max_pn:        The max scale factor magnitude of the pantheon analysis.
@@ -670,10 +803,10 @@ def plot_charm1_in_comparison_fields(x_max_pn: float, x_max_union: float, show: 
     """
     xl, yl, t = plot_comparison_fields()
     plt.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
-    x, s, s_err = build_charm1_agnostic(mode="pantheon+")
+    x, s, s_err = build_charm1_agnostic(mode="union2.1")
     h0_charm1 = str(current_expansion_rate(s))
     if save:
-        filename = "data_storage/figures/charm1_reconstruction_with_comparison_fields_pantheon+"
+        filename = "data_storage/figures/charm1_reformulated_reconstruction_with_comparison_fields_pantheon+"
     else:
         filename = ""
     plt.errorbar(x=x, y=s, yerr=s_err, color=blue, ecolor=light_blue, label=r"\texttt{CHARM1},"
@@ -686,7 +819,7 @@ def plot_charm1_in_comparison_fields(x_max_pn: float, x_max_union: float, show: 
 def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: float, show=True, save=True,
                                 reconstruction: tuple = None):
     """
-    Plots the synthetic ground truth and data it creates.
+    Plots the synthetic ground truth in signal space.
     :param reconstruction:      A tuple containing (reconstruction_mean, reconstruction_std)
     :param show: bool,          Whether to show the plot
     :param save: bool,          Whether to save the plot
@@ -696,7 +829,7 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
     :return:
     """
     x = x.field().val
-    plt.vlines(1, 0, 50, linestyles='dashed', label="End of synthetic data", color="black")
+    plt.vlines(2, 32, 37, linestyles='dashed', label="End of synthetic data", color="black")
     xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
     yl = r"$s(x)$"
     if save:
@@ -707,7 +840,7 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
     if reconstruction is not None:
         plt.errorbar(x=x, y=reconstruction[0], yerr=reconstruction[1], color=blue, ecolor=light_blue,
                      label=r"$\texttt{CHARM2}$ synthetic reconstruction", markersize=1)
-    show_plot(x_lim=(0, x_max_pn), y_lim=(29.5, 32.5), x_label=xl, y_label=yl, title="",
+    show_plot(x_lim=(0, 2), y_lim=(32, 40.5), x_label=xl, y_label=yl, title="",
               save_filename=filename, show=show)
 
 
@@ -736,17 +869,178 @@ def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_p
               save_filename=filename, show=show)
 
 
-def synthetic_ground_model_truth(signal_space: RGSpace):
+def PiecewiseLinear(signal_space: RGSpace, omega_m_custom: float = None, omega_l_custom: float = None):
     """
-    A generative line model for a piecewise linear function with two contributions
-    :param signal_space:
+    A generative line model for a piecewise linear function with two contributions.
+    Represents a LCDM model with an offset of around 30.
+    :param omega_l_custom:  Contribution through cosmological constant
+    :param omega_m_custom:  Contribution through matter.
+    :param signal_space:    The signal regular grid space
     :return:
     """
     x = signal_space
     expander = ContractionOperator(domain=x, spaces=None).adjoint
-    x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(3 * x.field().val)))
+    x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(5 * x.field().val)))
 
-    contribution1 = expander @ NormalTransform(0.3, 1e-16, key="contribution1")
-    contribution2 = expander @ NormalTransform(0.7, 1e-16, key="contribution2")
-    adder = Adder(a=Field(domain=DomainTuple.make(x), val=30 * np.ones(len(x.field().val))))
-    return adder(np.log(x_coord(contribution1) + contribution2))
+    omega_m, m_deviation = (1, 1)
+    omega_l, l_deviation = (1, 1)
+    if omega_m_custom is not None and omega_l_custom is not None:
+        omega_m, m_deviation = (omega_m_custom, 1e-16)
+        omega_l, l_deviation = (omega_l_custom, 1e-16)
+    contribution1 = expander @ LognormalTransform(omega_m, m_deviation, key="omega m contribution", N_copies=0)
+    contribution2 = expander @ LognormalTransform(omega_l, l_deviation, key="omega l contribution", N_copies=0)
+    # adder = Adder(a=Field(domain=DomainTuple.make(x), val=30 * np.ones(len(x.field().val))))
+    offset = expander @ NormalTransform(30, 5, key="offset of piecewise linear")
+    return np.log(x_coord(contribution1) + contribution2) + offset
+
+
+def plot_prior_distribution(mean_std_tuple, n_samples=50, distribution_name="normal"):
+    """
+    Plot distribution of some hyperparameter x that has mean and standard deviation μ
+    and σ according to 'mean_std_tuple'.
+    :param mean_std_tuple:      μ, σ = mean_std_tuple
+    :param n_samples:           The number of samples to plot.
+                                Default: 50
+    :param distribution_name:   Either 'normal' or 'lognormal'
+    :return:
+    """
+    mean, sigma = mean_std_tuple
+    log_mean, log_sigma = lognormal_moments(mean, sigma)
+    key = "distribution operator for plot"
+    if distribution_name == "normal":
+        op = NormalTransform(mean, sigma, key=key)
+    elif distribution_name == "lognormal":
+        op = NormalTransform(log_mean, log_sigma, key=key).ptw("exp")
+    else:
+        raise ValueError("Unknown distribution")
+    plot_priorsamples(op, n_samples=n_samples)
+
+
+def LCDM_MODEL(signal_space):
+    """
+    Flat LCDM
+    """
+    x = signal_space
+
+    expander = ContractionOperator(domain=x, spaces=0).adjoint
+    omega_m = expander @ LognormalTransform(.3, .1, key="Omega m", N_copies=0)
+    rho_0 = expander @ LognormalTransform(8269771251557, 8269771251557 / 10, key="rho 0", N_copies=0)
+
+    import nifty8 as ift
+    e_to_the_power_of_3x_field = (x.field() * 3).exp() - 1
+    e_to_the_pow_op = DiagonalOperator(diagonal=e_to_the_power_of_3x_field)
+
+    # one = DiagonalOperator(diagonal=ift.makeField(domain=x, arr=np.ones(x.shape[0])))
+    one = ift.Adder(a=ift.makeField(domain=x, arr=np.ones(x.shape[0])))
+    part1 = e_to_the_pow_op @ omega_m
+    one_plus_part1 = one @ part1
+    logi = one_plus_part1.log()
+
+    return logi + rho_0.log()
+
+
+def plot_lognormal_histogram(mean: float, sigma: float, n_samples: int, vlines: np.array = None, save=False, show=True):
+    """
+    Plots a histogram visualizing the moment-matched lognormal transform.
+    If `vlines` is provided, vertical lines will be drawn at the specified x-locations.
+    Usage:
+
+    plot_lognormal_histogram(mean=.06, sigma=0.03, n_samples=10000, vlines=[0.023, 0.05], save=True, show=True)
+
+    :param mean:        The mean from which logmean is calculated with logsigma's help.
+    :param sigma:       The sigma from which logsigma is calculated.
+    :param n_samples:   How many samples to plot
+    :param vlines:      An array consisting of x-locations at which to draw vertical lines.
+    :return:
+    """
+    op = LognormalTransform(mean=mean, sigma=sigma, key='Lognormal for Histogram', N_copies=0)
+    op_samples = np.array([op(s).val for s in [from_random(op.domain) for i in range(n_samples)]])
+    plt.hist(op_samples, bins=200, label=r"Lognormal with $(\mu, \sigma)=$" + f"$({mean}, {sigma})$",
+             histtype='step', facecolor='white', color="black")
+
+    if vlines is not None:
+        vline_cmb_std = vlines[0]
+        vline_sn_std = vlines[1]
+        plt.vlines(vline_cmb_std, ymin=0, ymax=350, label=r"$a_{\mathrm{CMB}}$", color="black",
+                   ls="--")
+        plt.vlines(vline_sn_std, ymin=0, ymax=350, label=r"$a_{\mathrm{SN}}$", color="black")
+    plt.ylabel("Samples")
+    plt.xlabel("Bins")
+    # Right-align the text in the legend
+    plt.legend()
+    plt.xlim(0, 1)
+    if save:
+        filename = "data_storage/figures/histogram_of_lognormal_distribution"
+        plt.tight_layout(pad=2)
+        plt.savefig(filename + ".png", pad_inches=1)
+    if show:
+        plt.show()
+
+
+def draw_hubble_diagrams(show=False, save=False):
+    z_u, mu_u, covariance_u = read_data_union()
+    z_p, mu_p, _ = read_data_pantheon()
+    z_d, mu_d, _ = read_data_des()
+
+    convert_to_x = lambda z: np.log(1+z)
+    x_u, x_p, x_d = [convert_to_x(z) for z in [z_u, z_p, z_d]]
+
+    plt.subplot(2, 1, 1)
+
+    min_redshift = np.log(1+0)
+    max_redshift = np.log(1+2.26)
+
+    n_u, bins_u, _ = plt.hist(x_u, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="-")
+    n_p, bins_p, _ = plt.hist(x_p, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="")
+    n_d, bins_d, _ = plt.hist(x_d, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="")
+
+    # Manually create step-like plot with constant height over each bin
+    bin_centers_u = np.repeat(bins_u, 2)[1:-1]
+    n_repeated_u = np.repeat(n_u, 2)
+    bin_centers_u = np.insert(bin_centers_u, 0, 0)  # Insert 0 at the beginning
+    n_repeated_u = np.insert(n_repeated_u, 0, 0)  # Insert 0 at the beginning
+
+    bin_centers_p = np.repeat(bins_p, 2)[1:-1]
+    n_repeated_p = np.repeat(n_p, 2)
+    bin_centers_p = np.insert(bin_centers_p, 0, 0)  # Insert 0 at the beginning
+    n_repeated_p = np.insert(n_repeated_p, 0, 0)  # Insert 0 at the beginning
+
+    bin_centers_d = np.repeat(bins_d, 2)[1:-1]
+    n_repeated_d = np.repeat(n_d, 2)
+    bin_centers_d = np.insert(bin_centers_d, 0, 0)  # Insert 0 at the beginning
+    n_repeated_d = np.insert(n_repeated_d, 0, 0)  # Insert 0 at the beginning
+
+    plt.plot(bin_centers_u, n_repeated_u, linestyle="-", markersize=0, color="black", lw=0.5,
+             label="Union2.1")
+    plt.plot(bin_centers_p, n_repeated_p, linestyle="--", markersize=0, color="black", lw=0.5, dashes=[10, 5],
+             label="Pantheon+")
+    plt.plot(bin_centers_d, n_repeated_d, linestyle="-.", markersize=0, color="black", lw=0.5, dashes=[20, 15, 1, 1],
+             label="DESY5")
+    plt.ylabel("Number of SN")
+    plt.legend()
+    plt.xlim(min_redshift-0.07, max_redshift+0.07)
+
+    plt.subplot(2, 1, 2)
+    plt.plot(x_u, mu_u, marker="o", lw=0,  markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
+             label="Union2.1",)
+    plt.plot(x_p, mu_p, marker="s", lw=0, markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
+             label="Pantheon+")
+    plt.plot(x_d, mu_d, marker="D", lw=0, markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
+             label="DESY5")
+    plt.xlabel(r"$x=\mathrm{log}(1+z)$")
+    plt.ylabel(r"$\mu$")
+    plt.legend()
+    plt.xlim(min_redshift-0.07, max_redshift+0.07)
+
+    plt.tight_layout()
+    if save:
+        plt.savefig("data_storage/figures/hubble_diagram")
+    if show:
+        plt.show()
+    plt.clf()
+
+
+draw_hubble_diagrams(save=True)
+
+# plot_comparison_fields(plot_fluctuations_scale_visualization=True)
+# plot_lognormal_histogram(mean=.4, sigma=.2, n_samples=10000, vlines=[0.147, 0.14], save=True, show=True)
