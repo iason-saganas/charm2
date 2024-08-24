@@ -17,7 +17,7 @@ def main_synthetic(plot_ground_truth, plot_mock_data):
     plot_synthetic_ground_truth(x=x, ground_truth=X.adjoint(ground_truth_field).val, x_max_pn=np.max(np.log(1+z_p)),
                                 save=False, show=plot_ground_truth)
     plot_synthetic_data(neg_scale_fac_mag=neg_a_mag, data=d.val, x_max_pn=np.max(np.log(1+z_p)),
-                        mu_arrays=np.concatenate((mu_p, mu_u)), save=False, show=plot_mock_data)
+                        mu_array=np.concatenate((mu_p, mu_u)), save=False, show=plot_mock_data)
 
     likelihood_energy = ift.GaussianEnergy(d, N.inverse) @ R
     global_iterations = 1
@@ -43,7 +43,8 @@ def main_synthetic(plot_ground_truth, plot_mock_data):
     # Unpickle the last inference run
     # posterior_samples = unpickle_me_this("synthetic/cfm_{'offset_mean': 0, 'offset_std': None, 'fluctuations': (1.8, 1.8), 'loglogavgslope': (-4, 1e-16), 'asperity': None, 'flexibility': None}_lm_{'slope': (2, 5), 'intercept': (30, 5)}.pickle")
 
-    store_meta_data()
+    store_meta_data(datetime_obj=now, duration_of_inference=inference_duration, len_d=len(d.val),
+                    inference_type='synthetic')
 
     posterior_realizations_list = posterior_samples
     s_mean, s_var = posterior_realizations_list.sample_stat(s)

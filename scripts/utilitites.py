@@ -23,6 +23,7 @@ from nifty8.utilities import lognormal_moments
 import gzip
 import os
 import shutil
+import datetime
 
 __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_sampling_rate', 'read_data_union',
            'read_data_pantheon', 'CovarianceMatrix', 'raise_warning', 'build_flat_lcdm', 'pickle_me_this',
@@ -30,7 +31,7 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'build_charm1_agnostic', 'plot_comparison_fields', 'show_plot', 'plot_flat_lcdm_fields',
            'plot_charm1_in_comparison_fields', 'LineModel', 'plot_synthetic_ground_truth', 'plot_synthetic_data',
            'PiecewiseLinear', 'plot_charm2_in_comparison_fields', 'plot_prior_distribution', 'LCDM_MODEL',
-           'read_data_des']
+           'read_data_des', 'store_meta_data']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -592,7 +593,7 @@ def store_meta_data(datetime_obj, duration_of_inference, len_d, inference_type):
     directory and deletes the temporary directory.
 
     Args:
-        datetime_obj (datetime): The datetime object representing when the inference run occurred.
+        datetime_obj (datetime object): The datetime object representing when the inference run occurred.
         duration_of_inference (float): The duration of the inference in seconds.
         len_d (int): The length of the dataset used for the inference.
         inference_type (str): A string indicating the type of inference ('synthetic' or 'real').
@@ -619,7 +620,7 @@ def store_meta_data(datetime_obj, duration_of_inference, len_d, inference_type):
         file.write(f"Time took in minutes: {duration_minutes:.2f}\n\n")
 
         # Append contents of the other files
-        for additional_file in ['counting_report', 'minisanity.txt']:
+        for additional_file in ['counting_report.txt', 'minisanity.txt']:
             additional_file_path = os.path.join(temp_dir, additional_file)
             if os.path.exists(additional_file_path):
                 with open(additional_file_path, 'r') as afile:
@@ -753,9 +754,6 @@ def plot_comparison_fields(plot_fluctuations_scale_visualization=False):
         plt.legend()
         plt.show()
     return handles
-
-
-# plot_comparison_fields()
 
 
 def show_plot(x_lim: tuple = None,
@@ -900,28 +898,38 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
               save_filename=filename, show=show)
 
 
-def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_pn: float, mu_arrays: np.array,
+def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_pn: float, mu_array: np.array,
                         show=True, save=True):
     """
     Plots the synthetic ground truth and data it creates.
     :param show: bool,              Whether to show the plot
     :param save: bool,              Whether to save the plot
-    :param mu_arrays: np.array,     Containing the μ arrays of different datasets, used to determine y-scale.
+    :param mu_array: np.array,     The mock distance moduli
     :param x_max_pn: float,     The max scale factor magnitude of the pantheon analysis.
     :param neg_scale_fac_mag:   The unidirectional line of sights x=np.log(1+z)
     :param data:                The constructed synthetic data
     :return:
     """
-    mu_min = np.min(mu_arrays.flatten())
-    mu_max = np.max(mu_arrays.flatten())
+    mu_min = np.min(mu_array)
+    mu_max = np.max(mu_array)
+
+    x_min = np.min(neg_scale_fac_mag)
+    x_max = np.max(neg_scale_fac_mag)
+
     xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
     yl = r"$\mu (x)$"
     if save:
         filename = "data_storage/figures/synthetic_data"
     else:
         filename = ""
+
+    plt.subplot(2, 1, 1)
+    plt.hist(neg_scale_fac_mag, histtype="step", color="black", lw=0.5, bins=10)
+    plt.ylabel(r"$\#$ of datapoints")
+    plt.xlim(-0.1+x_min, x_max+0.1)
+    plt.subplot(2, 1, 2)
     plt.plot(neg_scale_fac_mag, data, ".", color="black", label="Synthetic data points")
-    show_plot(x_lim=(0, x_max_pn), y_lim=(mu_min, mu_max), x_label=xl, y_label=yl, title="",
+    show_plot(x_lim=(-0.1+x_min, x_max+0.1), y_lim=(mu_min-0.1, mu_max+0.1), x_label=xl, y_label=yl, title="",
               save_filename=filename, show=show)
 
 
@@ -1094,7 +1102,6 @@ def draw_hubble_diagrams(show=False, save=False):
     if show:
         plt.show()
     plt.clf()
-
 
 # draw_hubble_diagrams(save=True)
 # plot_comparison_fields(plot_fluctuations_scale_visualization=True)
