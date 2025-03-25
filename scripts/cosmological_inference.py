@@ -1,28 +1,53 @@
-from setup_cosmological import *
+from .CONFIG_cosmological import *
+from time import time
 
-# likelihood_energy_union = ift.GaussianEnergy(d_u, N_u.inverse) @ R_u  # Union2.1 likelihood
-likelihood_energy_pantheon = ift.GaussianEnergy(d_p, N_p.inverse) @ R_p  # Pantheon+ likelihood
-global_iterations = 3
 
-posterior_samples = ift.optimize_kl(likelihood_energy=likelihood_energy_pantheon,
-                                    total_iterations=global_iterations,
-                                    n_samples=kl_sampling_rate,
-                                    kl_minimizer=descent_finder,
-                                    sampling_iteration_controller=ic_sampling_lin,
-                                    nonlinear_sampling_minimizer=geoVI_sampling_minimizer,
-                                    return_final_position=False,
-                                    resume=True,
-                                    output_directory=f"output_helper")
-# Save the inference run
-pickle_me_this(f"real/pantheon+_{arguments}", posterior_samples)
-print("Saved posterior samples as pickled object. Parameters of the inference: \n",
-      arguments,
-      "\nUse `analyze_stored_data` to visualize results.")
+def main_cosmological(data_to_use="Union2.1"):
 
-s_mean, s_var = posterior_samples.sample_stat(s)
+    likelihood, d, neg_a_mag, arguments, x, X, s, _ = cosmological_likelihood(data_to_use=data_to_use)
 
-# Signal Space Comparison Visualization
-plot_charm2_in_comparison_fields(x_max_pn=np.max(np.log(1 + z_p)), x_max_union=np.max(np.log(1+z_u)), show=True,
-                                 save=True, x=x.field().val, s=X.adjoint(s_mean).val,
-                                 s_err=np.sqrt(X.adjoint(s_var).val))
+    # For plotting purposes:
+    z_p, mu_p, _ = read_data_pantheon()
+    z_u, mu_u, _ = read_data_union()
+    z_d, mu_d, _ = read_data_des()
+    # plot_charm1_in_comparison_fields(x_max_pn=np.log(1+np.max(z_p)), x_max_union=np.log(1+np.max(z_u)), show=True)
 
+    print(f"\nUsing {data_to_use} data.\n")
+
+    # global_iterations = 32
+    global_iterations = 6  # FOR TESTING PURPOSES. REVERT BACK TO 32
+
+    inference_start = time()
+
+    posterior_samples = ift.optimize_kl(likelihood_energy=likelihood,
+                                        total_iterations=global_iterations,
+                                        n_samples=kl_sampling_rate,
+                                        kl_minimizer=descent_finder,
+                                        sampling_iteration_controller=ic_sampling_lin,
+                                        nonlinear_sampling_minimizer=geoVI_sampling_minimizer,
+                                        return_final_position=False,
+                                        resume=False,
+                                        output_directory=f"data_storage/pickled_inferences/cache_{data_to_use}")
+
+    inference_end = time()
+    inference_duration = inference_end - inference_start
+
+    now = get_datetime()
+    # Save the inference run
+    pickle_me_this(f"real/{now}", posterior_samples)
+
+    s_mean, s_var = posterior_samples.sample_stat(s)
+    s_err = np.sqrt(X.adjoint(s_var).val)
+
+    current_expansion_mean, current_expansion_err = current_expansion_rate(X.adjoint(s_mean).val, s_err)
+    H0_estimate = f"Calculated value of H0: {current_expansion_mean} ± {current_expansion_err}"
+
+    store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(d.val), expansion_rate=H0_estimate,
+                    inference_type='real', signal_model_param=arguments, global_kl_iterations=global_iterations,
+                    data_storage_dir_name=f"cache_{data_to_use}")
+
+    # Signal Space Comparison Visualization
+    plot_charm2_in_comparison_fields(x_max_pn=np.max(np.log(1 + z_p)), x_max_union=np.max(np.log(1+z_u)),
+                                     x_max_des=np.max(np.log(1+z_d)), show=True, save=True, x=x.field().val,
+                                     s=X.adjoint(s_mean).val, s_err=s_err, dataset_used=data_to_use,
+                                     neg_a_mag=neg_a_mag)

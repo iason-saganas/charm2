@@ -1,5 +1,5 @@
 # Figure
-figure.figsize: 10, 6    # Figure size in inches (width, height)
+figure.figsize: 10, 6    # Figure size in inches (width, height) (10, 6)
 figure.dpi: 100         # Dots per inch
 
 # Axes

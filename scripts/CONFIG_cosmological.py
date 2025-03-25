@@ -11,68 +11,76 @@ import nifty8 as ift
 # Read the Covariance matrix from the data for the Gaussian Likelihood
 # Define iteration and minimization control
 
-# Read raw data. quantity_u := Union2.1 data; quantity_p := Pantheon+ data.
-z_u, mu_u, covariance_u = read_data_union()
-z_p, mu_p, covariance_p = read_data_pantheon()
-z_d, mu_d, covariance_d = read_data_des()
+# Read raw data. quantity_u := Union2.1 data; quantity_p := Pantheon+ data; quantity_d := DESY5 data.
 
 
-print("Points lying higher than z=1.12 (x=0.75) in pantheon: ", len(z_p[np.where(z_p > 1.12)]))
+def cosmological_likelihood(data_to_use):
+    z, mu, covariance = read_data(data_to_use)
 
-config = {
-    'Signal Field Resolution': 1024,  # 2**10
-    'Length of signal space': np.max(np.log(1+z_p)),  # x_max. Has to be set manually according to which data is used
-    'Factor to extend signal space size by': 1.3,
-}
-n_pix, x_length, x_fac = [float(setting) for setting in config.values()]
-# n_dp_u = len(z_u)
-n_dp_p = len(z_p)
+    config = {
+        'Signal Field Resolution': 4096,  # 2**12
+        'Length of signal space': np.max(np.log(1 + z)),
+        'Factor to extend signal space size by': 1.3,
+    }
 
-pxl_size = x_length / n_pix  # bin size
+    n_pix, x_length, x_fac = [float(setting) for setting in config.values()]
+    n_dp = len(z)
 
-x = ift.RGSpace(n_pix, distances=pxl_size)  # The signal space.
-x_ext = ift.RGSpace(x_fac * n_pix, distances=pxl_size)  # The signal space extended by the in `config` specified factor.
+    pxl_size = x_length / n_pix  # bin size
 
-x = attach_custom_field_method(x)  # Attach the custom `field` method.
-x_ext = attach_custom_field_method(x_ext)  # Attach the custom `field` method.
-# data_space_u = ift.UnstructuredDomain((n_dp_u,))
-data_space_p = ift.UnstructuredDomain((n_dp_p,))
+    x = ift.RGSpace(n_pix, distances=pxl_size)  # The signal space.
+    x_ext = ift.RGSpace(x_fac * n_pix, distances=pxl_size)  # The signal space extended by the
+    # in `config` specified factor.
 
-# neg_a_mag_u = np.log(1+z_u)  # The negative scale factor magnitude, x = -log(a) = log(1+z)
-neg_a_mag_p = np.log(1+z_p)
+    x = attach_custom_field_method(x)  # Attach the custom `field` method.
+    x_ext = attach_custom_field_method(x_ext)  # Attach the custom `field` method.
 
-# Arguments of the correlated field model
-args_cfm = {
-    'offset_mean': 0,
-    'offset_std': None,
-    'fluctuations': (.4, .2),
-    'loglogavgslope': (-4, 1e-16),
-    'asperity': None,
-    'flexibility': None,
-}
+    data_space = ift.UnstructuredDomain((n_dp,))
 
-# Arguments of the line model
-args_lm = {
-    'slope': (2, 5),
-    'intercept': (30, 10)
-}
+    neg_a_mag = np.log(1+z)  # The negative scale factor magnitude, x = -log(a) = log(1+z)
 
-X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
+    # Arguments of the correlated field model
+    args_cfm = {
+        'offset_mean': 0,
+        'offset_std': None,
+        'fluctuations': (.4, .2),
+        'loglogavgslope': (-4, 1e-16),
+        'asperity': None,
+        'flexibility': None,
+    }
 
-# The to-be-inferred signal on the extended domain
-s = ift.SimpleCorrelatedField(target=x_ext, **args_cfm) + LineModel(target=x_ext, args=args_lm)
-arguments = 'cfm_' + str(args_cfm) + '_lm_' + str(args_lm)
+    # Arguments of the line model
+    args_lm = {
+        'slope': (2, 5),
+        'intercept': (30, 10)
+    }
 
-# s = LCDM_MODEL(x_ext)
-# plot_prior_distribution(mean_std_tuple=(.1, 1e-16), distribution_name="lognormal", n_samples=100)
-# Build the signal response, noise operator, data field and others
-# R_u = build_response(signal_space=x, signal=X.adjoint @ s, data_space=data_space_u, neg_scale_factor_mag=neg_a_mag_u)
-R_p = build_response(signal_space=x, signal=X.adjoint @ s, data_space=data_space_p, neg_scale_factor_mag=neg_a_mag_p)
-# ift.plot_priorsamples(s)
-# N_u = CovarianceMatrix(domain=data_space_u, matrix=covariance_u, sampling_dtype=np.float64, tol=1e-4)
-N_p = CovarianceMatrix(domain=data_space_p, matrix=covariance_p, sampling_dtype=np.float64, tol=1e-4)
-# d_u = ift.Field(domain=ift.DomainTuple.make(data_space_u,), val=mu_u)
-d_p = ift.Field(domain=ift.DomainTuple.make(data_space_p,), val=mu_p)
+    X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
+
+    # The to-be-inferred signal on the extended domain
+    s = ift.SimpleCorrelatedField(target=x_ext, **args_cfm) + LineModel(target=x_ext, args=args_lm)
+    arguments = 'cfm_' + str(args_cfm) + '_lm_' + str(args_lm)
+
+    # Build the signal response, noise operator, data field and others
+    R = build_response(signal_space=x, signal=X.adjoint @ s, data_space=data_space, neg_scale_factor_mag=neg_a_mag)
+
+    N = CovarianceMatrix(domain=data_space, matrix=covariance, sampling_dtype=np.float64, tol=1e-4)
+
+    d = ift.Field(domain=ift.DomainTuple.make(data_space,), val=mu)
+
+    # FOR ANALYSIS OF POSSIBLE SYSTEMATIC EFFECTS. UNCOMMENT WHEN NO LONGER NEEDED:
+
+    bump_idx = np.where(neg_a_mag > 0.44)
+    bump_vals = np.zeros_like(d.val)
+    bump_vals[bump_idx] = +0.008
+
+    # bump_vals[bump_idx] = -0.04
+    d = d + ift.Field.from_raw(d.domain, arr=bump_vals)
+
+    likelihood_energy = ift.GaussianEnergy(d, N.inverse) @ R
+
+    return likelihood_energy, d, neg_a_mag, arguments, x, X, s, covariance
+
 
 # Iteration control for `MGVI` and linear parts of the inference
 ic_sampling_lin = ift.AbsDeltaEnergyController(name="Precise linear sampling", deltaE=0.02, iteration_limit=100)

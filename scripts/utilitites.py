@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from nifty8.domains.rg_space import RGSpace
 from nifty8.domain_tuple import DomainTuple
 from nifty8.field import Field
@@ -12,7 +13,6 @@ from nifty8.operators.operator import _OpChain
 from nifty8.domains.unstructured_domain import UnstructuredDomain
 from nifty8.operators.contraction_operator import ContractionOperator
 from nifty8.operators.normal_operators import NormalTransform, LognormalTransform
-import matplotlib.pyplot as plt
 from data_storage.style_components.matplotlib_style import *
 import pandas as pd
 from nifty8.operators.matrix_product_operator import MatrixProductOperator
@@ -24,14 +24,15 @@ import gzip
 import os
 import shutil
 import datetime
+import matplotlib.gridspec as gridspec
 
 __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_sampling_rate', 'read_data_union',
            'read_data_pantheon', 'CovarianceMatrix', 'raise_warning', 'build_flat_lcdm', 'pickle_me_this',
-           'unpickle_me_this', 'current_expansion_rate', 'attach_custom_field_method', 'chi_square',
+           'unpickle_me_this', 'current_expansion_rate', 'attach_custom_field_method', 'chi_square_dof',
            'build_charm1_agnostic', 'plot_comparison_fields', 'show_plot', 'plot_flat_lcdm_fields',
            'plot_charm1_in_comparison_fields', 'LineModel', 'plot_synthetic_ground_truth', 'plot_synthetic_data',
-           'PiecewiseLinear', 'plot_charm2_in_comparison_fields', 'plot_prior_distribution', 'LCDM_MODEL',
-           'read_data_des', 'store_meta_data']
+           'PiecewiseLinear', 'plot_charm2_in_comparison_fields', 'plot_prior_distribution', 'calculate_approximate_mode',
+           'read_data_des', 'store_meta_data', 'get_datetime', 'read_data', 'plot_lognormal_histogram',]
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -111,12 +112,14 @@ def unidirectional_radial_los(n_los: int, uniform_drawing=False) -> np.ndarray:
     """
     n_los = int(n_los)
     if uniform_drawing:
-        arr = 2*np.random.rand(n_los)
+        arr = 1.2*np.random.rand(n_los)
         ends = np.sort(arr)
     else:
-        arr = np.random.lognormal(mean=0, sigma=1, size=n_los)
+        # arr = 1.2*np.random.lognormal(mean=0, sigma=0.9, size=n_los)
+        arr = 1.2*np.random.exponential(scale=2, size=n_los)
+        # arr = 1.2*np.random.lognormal(mean=1, sigma=0.2, size=n_los) + np.append(0.1*np.random.rand(10),(np.zeros(n_los-10)))
         maximum = np.max(arr)
-        ends = np.sort(arr / maximum)
+        ends = 1.2*np.sort(arr / maximum)
     return ends
 
 
@@ -303,7 +306,19 @@ def read_data_des():
     mu_obs = mu_obs[ordering_indices]
     cov_mat = cov_mat[ordering_indices][:, ordering_indices]
     print("\tFinished")
+
     return zCMB, mu_obs, cov_mat
+
+
+def read_data(data_to_use):
+    if data_to_use == "Union2.1":
+        return read_data_union()
+    elif data_to_use == "Pantheon+":
+        return read_data_pantheon()
+    elif data_to_use == "DESY5":
+        return read_data_des()
+    else:
+        raise ValueError(f"Can't read unknown data <{data_to_use}>")
 
 
 def spectral_decompose(matrix: np.ndarray, tol: float) -> Tuple:
@@ -438,23 +453,27 @@ def build_charm1_agnostic(mode="union2.1"):
     :param mode: str,       One of 'union2.1' or 'pantheon+'.
     """
     if mode == "union2.1":
-        path_to_x = "../data_storage/raw_data/x_field_charm1_union2_1.txt"
-        path_to_s = "../data_storage/raw_data/s_field_charm1_union2_1.txt"
-        path_to_D = r"../data_storage/raw_data/D_field_charm1_union2_1.txt"
+        path_to_x = "data_storage/raw_data/x_field_charm1_union2_1.txt"
+        path_to_s = "data_storage/raw_data/s_field_charm1_union2_1.txt"
+        path_to_D = r"data_storage/raw_data/D_field_charm1_union2_1.txt"
         correction_offset = 0.0246747  # log(rho/rho0) in charm1 is not precisely at 0, which must be incorrect
     elif mode == "pantheon+":
-        path_to_x = "../data_storage/raw_data/x_field_charm1_pantheon+.txt"
-        path_to_s = "../data_storage/raw_data/s_field_charm1_pantheon+.txt"
-        path_to_D = r"../data_storage/raw_data/D_field_charm1_pantheon+.txt"
+        path_to_x = "data_storage/raw_data/x_field_charm1_pantheon+.txt"
+        path_to_s = "data_storage/raw_data/s_field_charm1_pantheon+.txt"
+        path_to_D = r"data_storage/raw_data/D_field_charm1_pantheon+.txt"
         correction_offset = 0.10272  # log(rho/rho0) in charm1 is not precisely at 0, which must be incorrect
     elif mode == "pantheon+_reformulated":
-        path_to_x = "../data_storage/raw_data/charm1_reformulated/x_field_charm1_pantheon+.txt"
-        path_to_s = "../data_storage/raw_data/charm1_reformulated/s_field_charm1_pantheon+.txt"
-        path_to_D = r"../data_storage/raw_data/charm1_reformulated/D_field_charm1_pantheon+.txt"
+        path_to_x = "data_storage/raw_data/charm1_reformulated/x_field_charm1_pantheon+.txt"
+        path_to_s = "data_storage/raw_data/charm1_reformulated/s_field_charm1_pantheon+.txt"
+        path_to_D = r"data_storage/raw_data/charm1_reformulated/D_field_charm1_pantheon+.txt"
+    elif mode == "des_reformulated":
+        path_to_x = "data_storage/raw_data/charm1_reformulated/x_field_charm1_des.txt"
+        path_to_s = "data_storage/raw_data/charm1_reformulated/s_field_charm1_des.txt"
+        path_to_D = r"data_storage/raw_data/charm1_reformulated/D_field_charm1_des.txt"
     else:
         raise ValueError("Unrecognized mode in `build_charm1_agnostic`.")
 
-    if mode != "pantheon+_reformulated":
+    if mode == "union2.1" or mode == "pantheon+":
         x = np.loadtxt(path_to_x)
         s_prime = np.loadtxt(path_to_s) - correction_offset
         D = np.loadtxt(path_to_D)
@@ -582,7 +601,8 @@ def unpickle_me_this(filename: str, absolute_path=False):
     return data
 
 
-def store_meta_data(datetime_obj, duration_of_inference, len_d, inference_type):
+def store_meta_data(name, duration_of_inference, len_d, inference_type, signal_model_param,
+                    global_kl_iterations, expansion_rate="", data_storage_dir_name="temp"):
     """
     Stores metadata related to an inference run in a text file and manages associated data files.
 
@@ -593,21 +613,27 @@ def store_meta_data(datetime_obj, duration_of_inference, len_d, inference_type):
     directory and deletes the temporary directory.
 
     Args:
-        datetime_obj (datetime object): The datetime object representing when the inference run occurred.
+        name (str): How the metadata file should be called, e.g. a datetime string
         duration_of_inference (float): The duration of the inference in seconds.
         len_d (int): The length of the dataset used for the inference.
         inference_type (str): A string indicating the type of inference ('synthetic' or 'real').
+        signal_model_param (str): A string containing the inference parameter values of the used cfm + line model.
+        global_kl_iterations (int): The number of global kl minimization runs.
+        expansion_rate: (str): Information about the H0 estimate from the reconstruction (optional)
+        data_storage_dir_name: Where the intermediate output information from `optimize_kl` is stored.
+        If temp (=> Synthetic inference) the folder is deleted.
+        If cache (=> Real inference), the folder is not deleted to ensure proper functionality of the `resume` arg of
+        `optimize_kl`.
 
     """
     # Create file name with datetime
-    timestamp = datetime_obj.strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"metadata_{timestamp}.txt"
+    filename = f"metadata_{name}.txt"
 
     # Convert duration from seconds to minutes
     duration_minutes = duration_of_inference / 60
 
     # Define paths
-    temp_dir = 'data_storage/pickled_inferences/temp'
+    temp_dir = f'data_storage/pickled_inferences/{data_storage_dir_name}'
     final_dir = f'data_storage/pickled_inferences/{inference_type}'
 
     # Ensure final directory exists
@@ -615,9 +641,12 @@ def store_meta_data(datetime_obj, duration_of_inference, len_d, inference_type):
 
     # Create the metadata file
     with open(filename, 'w') as file:
-        file.write(f"Charm2 inference run on {timestamp}. Mode: {inference_type}\n")
+        file.write(f"Charm2 inference run on the {transform_datetime_string(name)}. Mode: {inference_type}\n")
         file.write(f"Length of dataset: {len_d}\n")
-        file.write(f"Time took in minutes: {duration_minutes:.2f}\n\n")
+        file.write(f"Time took in minutes: {duration_minutes:.2f}\n")
+        file.write(f"Model parameters: {signal_model_param}\n")
+        file.write(f"{expansion_rate}\n")
+        file.write(f"Number of global KL minimization runs: {global_kl_iterations}\n\n")
 
         # Append contents of the other files
         for additional_file in ['counting_report.txt', 'minisanity.txt']:
@@ -633,7 +662,49 @@ def store_meta_data(datetime_obj, duration_of_inference, len_d, inference_type):
     shutil.move(filename, os.path.join(final_dir, filename))
 
     # Delete the temp directory and its contents
-    shutil.rmtree(temp_dir)
+    if data_storage_dir_name == "temp":
+        shutil.rmtree(temp_dir)
+    else:
+        # Don't remove files called f`cache{dataset_used}` for `resume` functionality of `optimize_kl` to work
+        pass
+
+
+def get_datetime():
+    """
+    Returns the current datetime as a string with microseconds stripped off,
+    spaces replaced by '_', and colons replaced by '-'.
+
+    Returns:
+        str: Formatted datetime string.
+    """
+    # Get the current datetime without microseconds
+    now = datetime.datetime.now().replace(microsecond=0)
+
+    # Convert to string and replace spaces and colons
+    formatted_datetime = now.strftime("%Y-%m-%d_%H-%M-%S")
+
+    return formatted_datetime
+
+
+def transform_datetime_string(datetime_str):
+    """
+    Transform the datetime string by replacing underscores with spaces and hyphens in the time part with colons.
+
+    Args:
+        datetime_str (str): The datetime string to transform.
+
+    Returns:
+        str: The transformed datetime string.
+    """
+    # Replace underscores with spaces
+    datetime_str = datetime_str.replace('_', ' ')
+
+    # Replace hyphens with colons in the time part
+    date_part, time_part = datetime_str.split(' ', 1)
+    time_part = time_part.replace('-', ':')
+
+    # Combine the date part and the transformed time part
+    return f"{date_part} {time_part}"
 
 
 def current_expansion_rate(s: np.array, delta_s: np.array = None) -> float:
@@ -666,14 +737,13 @@ def current_expansion_rate(s: np.array, delta_s: np.array = None) -> float:
         return np.round(H0, 2), np.round(delta_H, 5)
 
 
-def chi_square(vector1, vector2):
-    # Compute squared differences
-    squared_diff = (vector1 - vector2) ** 2
-
-    # Divide by vector1 and sum
-    chi_square_val = np.sum(squared_diff / vector1)
-
-    return chi_square_val
+def chi_square_dof(real, model, inv_cov):
+    # Compute squared differences, input the inverse noise covariance to calculate the chi^2_dof
+    # Degrees of freedom are the number of datapoints - 2 for loglogavgslope and fluctuations
+    # Althoug really, loglogavgslope is fixed in charm2.
+    raise_warning("Probably improper normalization of the chi^2 by the DOF.")
+    res = (real - model)
+    return (res.T @ inv_cov @ res) / (len(real) - 2)
 
 
 def build_comparison_fields():
@@ -695,7 +765,7 @@ def build_comparison_fields():
     return x_coordinates, cmb, sn
 
 
-def plot_comparison_fields(plot_fluctuations_scale_visualization=False):
+def plot_comparison_fields(plot_fluctuations_scale_visualization=False, ax_object=None):
     """
     Adds comparison fields to a plot, but does not show it.
 
@@ -703,6 +773,7 @@ def plot_comparison_fields(plot_fluctuations_scale_visualization=False):
     signal fields, as well as the residuals between said fits and the actual curves.
     This represents the point-wise fluctuations around the offset the correlated field needs to model.
     We take thus take the fluctuation parameter to be the square root of the mean squared residuals.
+    :param ax_object=None: A mpl ax object, if passed, instead of plt.plot, ax_object.plot will be called
 
     :return: handles: tuple,    A tuple containing three strings, representing x label, y label and title for the plot
                                 that can be fed into the function `show_plot()`.
@@ -711,18 +782,30 @@ def plot_comparison_fields(plot_fluctuations_scale_visualization=False):
     x, x_sparse = x_coordinates
     s_cmb, s_cmb_err, s_cmb_sparse, H0_cmb = cmb
     s_sn, s_sn_err, s_sn_sparse, H0_sn = sn
-    plt.errorbar(x=x, y=s_cmb, yerr=s_cmb_err, fmt="None",
-                 ecolor=(0, 0, 0, 0.1))
-    plt.errorbar(x=x, y=s_sn, yerr=s_sn_err, fmt="None",
-                 ecolor=(0, 0, 0, 0.1))
     dash_dot_dotted = (0, (3, 5, 1, 5, 1, 5))
-    plt.plot(x_sparse, s_cmb_sparse, ls=dash_dot_dotted, lw="1", color="black",
-             label=r'$s_{\mathrm{CMB}}$. $\hat{H}_0=' + str(H0_cmb) + '$',
-             )
     long_dash_with_offset = (5, (10, 3))
-    plt.plot(x_sparse, s_sn_sparse, ls=long_dash_with_offset, lw="1", color="black",
-             label=r'$s_{\mathrm{SN}}$. $\hat{H}_0=' + str(H0_sn) + '$',
-             )
+    if ax_object:
+        ax_object.errorbar(x=x, y=s_cmb, yerr=s_cmb_err, fmt="None",
+                           ecolor=(0, 0, 0, 0.1))
+        ax_object.errorbar(x=x, y=s_sn, yerr=s_sn_err, fmt="None",
+                           ecolor=(0, 0, 0, 0.1))
+        ax_object.plot(x_sparse, s_cmb_sparse, ls=dash_dot_dotted, lw="1", color="black",
+                 label=r'$s_{\mathrm{CMB}}$. $\hat{H}_0=' + str(H0_cmb) + '$',
+                 )
+        ax_object.plot(x_sparse, s_sn_sparse, ls=long_dash_with_offset, lw="1", color="black",
+                 label=r'$s_{\mathrm{SN}}$. $\hat{H}_0=' + str(H0_sn) + '$',
+                 )
+    else:
+        plt.errorbar(x=x, y=s_cmb, yerr=s_cmb_err, fmt="None",
+                     ecolor=(0, 0, 0, 0.1))
+        plt.errorbar(x=x, y=s_sn, yerr=s_sn_err, fmt="None",
+                     ecolor=(0, 0, 0, 0.1))
+        plt.plot(x_sparse, s_cmb_sparse, ls=dash_dot_dotted, lw="1", color="black",
+                 label=r'$s_{\mathrm{CMB}}$. $\hat{H}_0=' + str(H0_cmb) + '$',
+                 )
+        plt.plot(x_sparse, s_sn_sparse, ls=long_dash_with_offset, lw="1", color="black",
+                 label=r'$s_{\mathrm{SN}}$. $\hat{H}_0=' + str(H0_sn) + '$',
+                 )
     t = r"Flat $\Lambda$CDM Signal Fields." + "\nComparison Between CMB And Supernovae Measurements."
     xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
     yl = r"$s(x)$"
@@ -762,7 +845,8 @@ def show_plot(x_lim: tuple = None,
               show: bool = True,
               title: str = "",
               x_label: str = "",
-              y_label: str = "", ):
+              y_label: str = "",
+              loc: str="upper right"):
     """
     Shows the currently constructed plot.
     :param x_lim: tuple,        The limits on the x-axis.
@@ -776,7 +860,7 @@ def show_plot(x_lim: tuple = None,
     :param y_label: str,        The y label of the plot.
     :return:
     """
-    plt.legend()
+    plt.legend(loc=loc)
     if x_lim is not None:
         plt.xlim(*x_lim)
     if y_lim is not None:
@@ -816,36 +900,76 @@ def plot_flat_lcdm_fields(x_max: float, show: bool = False, save: bool = True):
 
 
 def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, x_max_pn: float, x_max_union: float,
-                                     show: bool = False, save: bool = True, ):
+                                     x_max_des: float, dataset_used: str, neg_a_mag, show: bool = False,
+                                     save: bool = True, additional_samples = None):
     """
     Plots the reconstructed charm1 curve using Union2.1 data into a figure containing CMB and SN comparison fields.
+    :param dataset_used:    Either `Union2.1`, `Pantheon+` or `DESY5`
     :param s_err:           The charm2 posterior standard deviation values.
     :param s:               The charm2 posterior mean values.
     :param x:               The coordinate axis of the charm2 reconstruction.
-    :param save:
     :param x_max_union:     A vertical line is plotted at this point, indicating the end of the dataset.
     :param x_max_pn:        The max scale factor magnitude of the pantheon analysis.
-    :param show:
+    :param save:            Bool, whether or not to save the plot
+    :param show:            Bool, whether or not to show the plot
+    :param neg_a_mag:       The `x` array used in order to plot a histogram of it in the upper panel
+    :param additional_samples: Additional fields to add to the plot (e.g. all posterior samples).
+                               Needs to be a list of arrays.
     :return:
     """
-    xl, yl, t = plot_comparison_fields()
-    plt.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
+
+    # Create a figure
+    fig = plt.figure(figsize=(10, 8))
+
+    # Create a GridSpec with 3 rows and 1 column
+    gs = gridspec.GridSpec(2, 1, height_ratios=[1, 2])
+
+    # Create the first subplot, occupying the first row
+    ax1 = fig.add_subplot(gs[0])
+
+    # Create the second subplot, occupying the second and third rows
+    ax2 = fig.add_subplot(gs[1:])
+
+    # Histogram of data
+    ax1.hist(neg_a_mag, histtype="step", color="black", lw=0.5, bins=10)
+    ax1.set_ylabel(r"$\#$ of dtps")
+    ax1.set_xlim(0, x_max_pn)
+
+    # Reconstruction in signal space
+    xl, yl, t = plot_comparison_fields(ax_object=ax2)
+
+    if dataset_used == "Union2.1":
+        ax2.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
+    elif dataset_used == "DESY5":
+        ax2.vlines(x_max_des, 0, 50, linestyles='dashed', label="End of DESY5 data")
+    else:
+        pass
     current_expansion_mean, current_expansion_err = current_expansion_rate(s, s_err)
     h0_charm2 = str(current_expansion_mean)
-    print("Calculated value of H0: ", current_expansion_mean, " ± ", current_expansion_err)
+    now = get_datetime()
     if save:
-        filename = "data_storage/figures/charm2_reconstruction_pantheon+_cfm_model_fluct_0_2_0_2_final_maybe"
+        filename = f"data_storage/figures/charm2_reconstruction_{dataset_used}_{now}"
     else:
         filename = ""
-    plt.errorbar(x=x, y=s, yerr=s_err, color=blue, ecolor=light_blue, label=r"\texttt{CHARM2},"
-                                                                            r"Pantheon+ data. $\hat{H}_0=" + h0_charm2
-                                                                            + "$",
-                 markersize=1)
+
+    # For visualization (transparency) purposes the field values are cut in half two times
+    x_reduced = remove_every_second(x, n=2)
+    s_reduced = remove_every_second(s, n=2)
+    s_err_reduced = remove_every_second(s_err, n=2)
+    ax2.errorbar(x=x_reduced, y=s_reduced, yerr=s_err_reduced, color=blue, ecolor=light_blue,
+                 label=r"\texttt{charm2}, " + dataset_used + r" data. $\hat{H}_0=" + h0_charm2 + "$", markersize=1)
+
+    if additional_samples is not None:
+        for s_sample in additional_samples:
+            s_red = remove_every_second(s_sample, n=2)
+            ax2.plot(x_reduced, s_red, color="black", alpha=0.5)
+
+    plt.tight_layout()
     show_plot(x_lim=(0, x_max_pn), y_lim=(29.5, 32.5), x_label=xl, y_label=yl, title="",
-              save_filename=filename, show=show)
+              save_filename=filename, show=show, loc="upper left")
 
 
-def plot_charm1_in_comparison_fields(x_max_pn: float, x_max_union: float, show: bool = False, save: bool = True):
+def plot_charm1_in_comparison_fields(show: bool = False, save: bool = True):
     """
     Plots the reconstructed charm1 curve using Union2.1 or Pantheon+ data into a figure containing CMB and SN
     comparison fields.
@@ -855,19 +979,50 @@ def plot_charm1_in_comparison_fields(x_max_pn: float, x_max_union: float, show: 
     :param show:
     :return:
     """
-    xl, yl, t = plot_comparison_fields()
-    plt.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
-    x, s, s_err = build_charm1_agnostic(mode="union2.1")
+
+    z_u, mu_u, _ = read_data_union()
+    z_p, mu_p, _ = read_data_pantheon()
+
+    neg_a_mag_u = np.log(1 + z_u)
+    neg_a_mag_p = np.log(1 + z_p)
+
+    x_max_pn = np.max(neg_a_mag_p)
+    x_max_union = np.max(neg_a_mag_u)
+
+    # Create a figure
+    fig = plt.figure(figsize=(10, 8))
+
+    # Create a GridSpec with 3 rows and 1 column
+    gs = gridspec.GridSpec(2, 1, height_ratios=[1, 2])
+
+    # Create the first subplot, occupying the first row
+    ax1 = fig.add_subplot(gs[0])
+
+    # Create the second subplot, occupying the second and third rows
+    ax2 = fig.add_subplot(gs[1:])
+
+    # Histogram of data
+    ax1.hist(neg_a_mag_u, histtype="step", color="black", lw=0.5, bins=10)
+    raise_warning("Probably wrong histogram shown")
+    ax1.set_ylabel(r"$\#$ of dtps")
+    ax1.set_xlim(0, x_max_pn)
+
+    xl, yl, t = plot_comparison_fields(ax_object=ax2)
+    ax2.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
+    x, s, s_err = build_charm1_agnostic(mode="des_reformulated")
     h0_charm1 = str(current_expansion_rate(s))
     if save:
-        filename = "data_storage/figures/charm1_reformulated_reconstruction_with_comparison_fields_pantheon+"
+        filename = "data_storage/figures/charm1_des_reformulated"
     else:
         filename = ""
-    plt.errorbar(x=x, y=s, yerr=s_err, color=blue, ecolor=light_blue, label=r"\texttt{CHARM1},"
-                                                                            r"Pantheon+ data. $\hat{H}_0=" + h0_charm1 + "$",
+    x_reduced = remove_every_second(x, 1)
+    s_reduced = remove_every_second(s, 1)
+    s_err_reduced = remove_every_second(s_err, 1)
+    ax2.errorbar(x=x_reduced, y=s_reduced, yerr=s_err_reduced, color=blue, ecolor=light_blue,
+                 label=r"\texttt{charm1}, Union2.1 data. $\hat{H}_0=" + h0_charm1 + "$",
                  markersize=1)
     show_plot(x_lim=(0, x_max_pn), y_lim=(29.5, 32.5), x_label=xl, y_label=yl, title="",
-              save_filename=filename, show=show)
+              save_filename=filename, show=show, loc="upper left")
 
 
 def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: float, show=True, save=True,
@@ -883,19 +1038,41 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
     :return:
     """
     x = x.field().val
-    plt.vlines(2, 32, 37, linestyles='dashed', label="End of synthetic data", color="black")
+    plt.vlines(1.2, 32, 40.5, linestyles='dashed', label="End of synthetic data", color="black")
     xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
     yl = r"$s(x)$"
     if save:
-        filename = "data_storage/figures/synthetic_ground_truth_with_reconstruction"
+        filename = "data_storage/figures/synthetic_ground_truth_with_reconstruction_exponential_data"
     else:
         filename = ""
     plt.plot(x, ground_truth, "-", color="black", lw=1, label="Synthetic ground truth")
     if reconstruction is not None:
-        plt.errorbar(x=x, y=reconstruction[0], yerr=reconstruction[1], color=blue, ecolor=light_blue,
-                     label=r"$\texttt{CHARM2}$ synthetic reconstruction", markersize=1)
-    show_plot(x_lim=(0, 2), y_lim=(32, 40.5), x_label=xl, y_label=yl, title="",
-              save_filename=filename, show=show)
+        # For visualization purposes, the arrays are cut in half two times
+        # such that the errorbars look transparent.
+        signal_domain_reduced = remove_every_second(x, n=2)
+        signal_field_reduced = remove_every_second(reconstruction[0], n=2)
+        error_field_reduced = remove_every_second(reconstruction[1], n=2)
+        plt.errorbar(x=signal_domain_reduced, y=signal_field_reduced, yerr=error_field_reduced, color=blue, ecolor=light_blue,
+                     label=r"$\texttt{charm2}$ synthetic reconstruction", markersize=1)
+
+    show_plot(x_lim=(0, 1.2+0.1), y_lim=(32, 36.8), x_label=xl, y_label=yl, title="",
+              save_filename=filename, show=show, loc="upper left")
+
+
+def remove_every_second(arr, n):
+    """
+    Removes every second element from the array, repeated n times.
+
+    Parameters:
+    arr (np.ndarray): The input array.
+    n (int): The number of times to remove every second element.
+
+    Returns:
+    np.ndarray: The resulting array after n iterations.
+    """
+    for _ in range(n):
+        arr = np.delete(arr, np.arange(1, arr.size, 2))
+    return arr
 
 
 def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_pn: float, mu_array: np.array,
@@ -904,7 +1081,7 @@ def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_p
     Plots the synthetic ground truth and data it creates.
     :param show: bool,              Whether to show the plot
     :param save: bool,              Whether to save the plot
-    :param mu_array: np.array,     The mock distance moduli
+    :param mu_array: np.array,     The real distance moduli used to get mu_min and mu_max for plotting purposes.
     :param x_max_pn: float,     The max scale factor magnitude of the pantheon analysis.
     :param neg_scale_fac_mag:   The unidirectional line of sights x=np.log(1+z)
     :param data:                The constructed synthetic data
@@ -919,7 +1096,7 @@ def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_p
     xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
     yl = r"$\mu (x)$"
     if save:
-        filename = "data_storage/figures/synthetic_data"
+        filename = "data_storage/figures/synthetic_data_exponential_distribution"
     else:
         filename = ""
 
@@ -930,7 +1107,7 @@ def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_p
     plt.subplot(2, 1, 2)
     plt.plot(neg_scale_fac_mag, data, ".", color="black", label="Synthetic data points")
     show_plot(x_lim=(-0.1+x_min, x_max+0.1), y_lim=(mu_min-0.1, mu_max+0.1), x_label=xl, y_label=yl, title="",
-              save_filename=filename, show=show)
+              save_filename=filename, show=show, loc="upper left")
 
 
 def PiecewiseLinear(signal_space: RGSpace, omega_m_custom: float = None, omega_l_custom: float = None):
@@ -978,29 +1155,6 @@ def plot_prior_distribution(mean_std_tuple, n_samples=50, distribution_name="nor
     else:
         raise ValueError("Unknown distribution")
     plot_priorsamples(op, n_samples=n_samples)
-
-
-def LCDM_MODEL(signal_space):
-    """
-    Flat LCDM
-    """
-    x = signal_space
-
-    expander = ContractionOperator(domain=x, spaces=0).adjoint
-    omega_m = expander @ LognormalTransform(.3, .1, key="Omega m", N_copies=0)
-    rho_0 = expander @ LognormalTransform(8269771251557, 8269771251557 / 10, key="rho 0", N_copies=0)
-
-    import nifty8 as ift
-    e_to_the_power_of_3x_field = (x.field() * 3).exp() - 1
-    e_to_the_pow_op = DiagonalOperator(diagonal=e_to_the_power_of_3x_field)
-
-    # one = DiagonalOperator(diagonal=ift.makeField(domain=x, arr=np.ones(x.shape[0])))
-    one = ift.Adder(a=ift.makeField(domain=x, arr=np.ones(x.shape[0])))
-    part1 = e_to_the_pow_op @ omega_m
-    one_plus_part1 = one @ part1
-    logi = one_plus_part1.log()
-
-    return logi + rho_0.log()
 
 
 def plot_lognormal_histogram(mean: float, sigma: float, n_samples: int, vlines: np.array = None, save=False, show=True):
@@ -1103,6 +1257,131 @@ def draw_hubble_diagrams(show=False, save=False):
         plt.show()
     plt.clf()
 
+
+def plot_h0_comparisons(show=True, save=False):
+    value_h0_union = 69.18
+    value_h0_union_err = 1.44
+    calibr_union = 70
+    calibr_union_err = 0
+
+    value_h0_pantheon = 71.40
+    value_h0_pantheon_err = 0.81
+    calibr_pantheon = 73.04
+    calibr_pantheon_err = 1.04
+
+    value_h0_des = 68.31
+    value_h0_des_err = 1.36
+    calibr_des = 70
+    calibr_des_err = 0
+
+    x = ["Union2.1", "Pantheon+", "DESY5"]
+
+    plt.figure(figsize=(10, 16))
+
+    plt.errorbar(x="Union2.1", y=value_h0_union, yerr=value_h0_union_err, fmt="x", color="black", lw=1, ecolor="black",
+                 label=r"\texttt{charm2} reconstructed value of $\hat{H}_0$", capsize=4)
+    plt.errorbar(x="Union2.1", y=calibr_union, yerr=calibr_union_err, fmt="D", color=blue, lw=1, capsize=4, ecolor=blue,
+                 label=r"$\hat{H}_0$ value used in calibration of dataset")
+
+    plt.errorbar(x="Pantheon+", y=value_h0_pantheon, yerr=value_h0_pantheon_err, fmt="x", color="black", lw=1, capsize=4)
+    plt.errorbar(x="Pantheon+", y=calibr_pantheon, yerr=calibr_pantheon_err, fmt="D", color=blue, lw=1, capsize=4,
+                 ecolor=blue,)
+
+    plt.errorbar(x="DESY5", y=value_h0_des, yerr=value_h0_des_err, fmt="x", color="black", lw=1, capsize=4)
+    plt.errorbar(x="DESY5", y=calibr_des, yerr=calibr_des_err, fmt="D", color=blue, lw=1, capsize=4, ecolor=blue,)
+
+    plt.legend(loc="upper right")
+    plt.ylabel(r"$H_0$ in units of $\mathrm{km/s/Mpc}$")
+    plt.ylim(66, 76)
+    if save:
+        plt.savefig("data_storage/figures/h0_comparisons.png")
+    if show:
+        plt.show()
+    plt.clf()
+
+
+def calculate_mode(arr, tolerance=0.1):
+    """
+    Calculate the mode of an array of discrete floating-point values.
+
+    The mode is determined by clustering values within a specified tolerance
+    and finding the cluster with the highest frequency.
+
+    Parameters:
+    arr (list of float): The input array of floating-point values.
+    tolerance (float, optional): The tolerance within which values are considered
+                                 equal for clustering purposes. Default is 0.01.
+
+    Returns:
+    float: The mode of the input array, calculated as the average of the values
+           in the largest cluster.
+
+    Example:
+    >> calculate_mode([0.2, 0.21, 0.22, 0.5, 0.9])
+    0.21
+    """
+    from collections import defaultdict
+
+    clusters = defaultdict(list)
+
+    # Clustering values within the tolerance
+    for value in arr:
+        placed = False
+        for key in clusters:
+            if abs(key - value) <= tolerance:
+                clusters[key].append(value)
+                placed = True
+                break
+        if not placed:
+            clusters[value].append(value)
+
+    # Finding the cluster with the maximum frequency
+    mode_cluster = max(clusters.values(), key=len)
+    mode_value = sum(mode_cluster) / len(mode_cluster)  # Average of the cluster values
+
+    return mode_value
+
+
+def pointwise_mode(arrays):
+    """
+    Calculate the point-wise mode of multiple 1D arrays.
+
+    The mode for each position is determined by clustering values within a
+    specified tolerance and finding the cluster with the highest frequency.
+
+    Parameters:
+    arrays (list of list of float): A list of 1D arrays containing floating-point values.
+
+    Returns:
+    numpy.ndarray: A 1D array containing the point-wise mode of the input arrays.
+
+    Example:
+    >> a = [0.2, 0.21, 0.22]
+    >> b = [0.2, 0.5, 0.9]
+    >> c = [0.2, 0.21, 0.22]
+    >> pointwise_mode([a, b, c])
+    array([0.2 , 0.21, 0.22])
+    """
+
+    # Stack the arrays vertically
+    stacked_array = np.vstack(arrays)
+
+    mode_array = []
+    for column in stacked_array.T:
+        mode_array.append(calculate_mode(column, tolerance=0.1))
+
+    return np.array(mode_array)
+
+
+def calculate_approximate_mode(posterior_realizations_list, padding_operator, op):
+    cropping = padding_operator.adjoint
+    posterior_samples = list(posterior_realizations_list.iterator(op))  # Nifty8 Field instances
+    posterior_samples_cleaned = [cropping(field).val for field in posterior_samples] # Extracted values
+    return pointwise_mode(posterior_samples_cleaned)
+
+
+# plot_h0_comparisons(save=True, show=False)
+# plot_charm1_in_comparison_fields(save=True, show=True)
 # draw_hubble_diagrams(save=True)
 # plot_comparison_fields(plot_fluctuations_scale_visualization=True)
-# plot_lognormal_histogram(mean=.4, sigma=.2, n_samples=10000, vlines=[0.147, 0.14], save=True, show=True)
+# plot_lognormal_histogram(mean=.07, sigma=.007, n_samples=5000, vlines=[0.147, 0.14], save=False, show=True)

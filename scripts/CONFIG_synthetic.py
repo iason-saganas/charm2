@@ -12,7 +12,7 @@ import numpy as np
 # Define iteration and minimization control
 
 n_dp = 500
-neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=True)  # The negative scale factor magnitude,
+neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=False)  # The negative scale factor magnitude,
 # x = -log(a) = log(1+z)
 
 config = {
