@@ -4,6 +4,7 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
     </content>
+    <content url="file://$MODULE_DIR$/../stability-of-submoons/.venv/lib/python3.12/site-packages" />
     <orderEntry type="jdk" jdkName="Python 3.12 (stability-of-submoons)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>

@@ -12,7 +12,7 @@ from nifty8.library.los_response import LOSResponse
 from nifty8.operators.operator import _OpChain
 from nifty8.domains.unstructured_domain import UnstructuredDomain
 from nifty8.operators.contraction_operator import ContractionOperator
-from nifty8.operators.normal_operators import NormalTransform, LognormalTransform
+from nifty8.operators.normal_operators import NormalTransform, LognormalTransform, StandardUniformTransform
 from data_storage.style_components.matplotlib_style import *
 import pandas as pd
 from nifty8.operators.matrix_product_operator import MatrixProductOperator
@@ -25,6 +25,7 @@ import os
 import shutil
 import datetime
 import matplotlib.gridspec as gridspec
+from scipy.stats import norm
 
 __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_sampling_rate', 'read_data_union',
            'read_data_pantheon', 'CovarianceMatrix', 'raise_warning', 'build_flat_lcdm', 'pickle_me_this',
@@ -32,7 +33,9 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'build_charm1_agnostic', 'plot_comparison_fields', 'show_plot', 'plot_flat_lcdm_fields',
            'plot_charm1_in_comparison_fields', 'LineModel', 'plot_synthetic_ground_truth', 'plot_synthetic_data',
            'PiecewiseLinear', 'plot_charm2_in_comparison_fields', 'plot_prior_distribution', 'calculate_approximate_mode',
-           'read_data_des', 'store_meta_data', 'get_datetime', 'read_data', 'plot_lognormal_histogram',]
+           'read_data_des', 'store_meta_data', 'get_datetime', 'read_data', 'plot_lognormal_histogram',
+           'plot_prior_cfm_samples', 'posterior_parameters', 'visualize_posterior_histograms',
+           'construct_initial_position', 'evolving_dark_energy_fit']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -53,10 +56,11 @@ def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
     else:
         alpha = NormalTransform(mean=alpha_mean, sigma=alpha_std, key="line model slope")
     beta = NormalTransform(mean=beta_mean, sigma=beta_std, key="line model y-intercept")
-    alpha = contraction.adjoint @ alpha
+    alpha = contraction.adjoint @ alpha  # distribute the one alpha value that is drawn over the whole domain
     beta = contraction.adjoint @ beta
     x_coord = DiagonalOperator(diagonal=x.field())
     line_model = x_coord @ alpha + beta
+    line_model.myAttr = "Line test"
     return line_model
 
 
@@ -113,13 +117,15 @@ def unidirectional_radial_los(n_los: int, uniform_drawing=False) -> np.ndarray:
     n_los = int(n_los)
     if uniform_drawing:
         arr = 1.2*np.random.rand(n_los)
+        # arr = 2*np.random.rand(n_los)
         ends = np.sort(arr)
     else:
+        end_of_data = 1.2
         # arr = 1.2*np.random.lognormal(mean=0, sigma=0.9, size=n_los)
-        arr = 1.2*np.random.exponential(scale=2, size=n_los)
+        arr = end_of_data*np.random.exponential(scale=2, size=n_los)
         # arr = 1.2*np.random.lognormal(mean=1, sigma=0.2, size=n_los) + np.append(0.1*np.random.rand(10),(np.zeros(n_los-10)))
         maximum = np.max(arr)
-        ends = 1.2*np.sort(arr / maximum)
+        ends = end_of_data*np.sort(arr / maximum)
     return ends
 
 
@@ -177,7 +183,7 @@ def plot_all_synthetic_post_kl(x_field_val, s_mean_val, sqrt_s_var_val, ground_t
     plt.errorbar(x_field_val, s_mean_val, yerr=sqrt_s_var_val, fmt='-', color=blue, ecolor=light_blue,
                  label=r'Reconstruction (lightblue: $1\sigma$')
     plt.plot(x_field_val, ground_truth_signal_val, '-', color='black', label='Ground Truth')
-    plt.xlabel(r'Negative Scale Factor Magnitude $x=-\mathrm{log}(a)=\mathrm{log}(1+z)$')
+    plt.xlabel(r'Negative Scale Factor Magnitude $x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$')
     plt.ylabel('Signal Field $s(x)$')
     plt.title('Reconstruction Vs. Ground Truth')
     # plt.xlim(0, 1)
@@ -192,7 +198,7 @@ def plot_all_synthetic_post_kl(x_field_val, s_mean_val, sqrt_s_var_val, ground_t
                  ecolor=lighter_blue, label=r'$2\sigma$')
     plt.errorbar(x_field_val, s_mean_val - ground_truth_signal_val, color=blue, yerr=3 * sqrt_s_var_val, fmt='-',
                  ecolor=lightest_blue, label=r'$3\sigma$')
-    plt.xlabel(r'Negative Scale Factor Magnitude $x=-\mathrm{log}(a)=\mathrm{log}(1+z)$')
+    plt.xlabel(r'Negative Scale Factor Magnitude $x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$')
     plt.ylabel(r'Residuals $\Delta s(x)$')
     plt.title('Reconstructed Signal Field Deviation From Ground Truth')
     plt.plot(neg_a_mag, 0.75 * np.ones(len(neg_a_mag)), ".", lw=0, color=light_red, label='Distribution Of Datapoints')
@@ -491,6 +497,35 @@ def build_charm1_agnostic(mode="union2.1"):
     return x, s, s_err
 
 
+def build_flat_evolving_dark_energy(x: np.array, H_0=68.37, w_a=-8.8, w_0=-0.36, omega_m0=0.495):
+
+    # Values are from this paper: https://arxiv.org/pdf/2401.02929
+    # H_0 = 68.37 # Self-chosen!
+    # H_0 = 73.7 # Self-chosen!
+    # w_a = -8.8
+    # w_0 = -0.36
+    # omega_m0 = 0.495
+
+    # Another paper: https://arxiv.org/pdf/2503.06712
+    # H_0 = 67.8
+    # w_a = -1.37
+    # w_0 = -0.67
+    # omega_m0 = 0.31
+
+    omega_l0 = 1 - omega_m0
+    m = 3 / (8 * np.pi * G)
+    E_sq = omega_m0*np.exp(3*x) + omega_l0 * np.exp(3*x*(1+w_0+w_a)) * np.exp( -3*(w_a*(1-np.exp(-x))))
+    inner_log_func = m * H_0 ** 2 * E_sq
+    s_base = np.log(inner_log_func)
+
+    return s_base
+
+
+def evolving_dark_energy_fit(x, s):
+    popt = curve_fit(build_flat_evolving_dark_energy, x, s)
+    print("popt: ", popt[0])
+
+
 def build_flat_lcdm(x: np.array, mode: str):
     """
     References:
@@ -782,32 +817,41 @@ def plot_comparison_fields(plot_fluctuations_scale_visualization=False, ax_objec
     x, x_sparse = x_coordinates
     s_cmb, s_cmb_err, s_cmb_sparse, H0_cmb = cmb
     s_sn, s_sn_err, s_sn_sparse, H0_sn = sn
-    dash_dot_dotted = (0, (3, 5, 1, 5, 1, 5))
-    long_dash_with_offset = (5, (10, 3))
+    # dash_dot_dotted = (0, (3, 5, 1, 5, 1, 5))
+    dash_dot_dotted = (0, (15, 5))
+    # long_dash_with_offset = (5, (10, 3))
+    long_dash_with_offset = (0, (10, 5))
+
+    orange = (0.902, 0.624, 0.0)
+    light_orange = (0.902, 0.624, 0.0, 0.2)
+
+    green = (0.0, 0.62, 0.45)
+    light_green = (0.0, 0.62, 0.45, 0.2)
+
     if ax_object:
         ax_object.errorbar(x=x, y=s_cmb, yerr=s_cmb_err, fmt="None",
-                           ecolor=(0, 0, 0, 0.1))
+                           ecolor=light_green)
         ax_object.errorbar(x=x, y=s_sn, yerr=s_sn_err, fmt="None",
-                           ecolor=(0, 0, 0, 0.1))
-        ax_object.plot(x_sparse, s_cmb_sparse, ls=dash_dot_dotted, lw="1", color="black",
-                 label=r'$s_{\mathrm{CMB}}$. $\hat{H}_0=' + str(H0_cmb) + '$',
+                           ecolor=light_orange)
+        ax_object.plot(x_sparse, s_cmb_sparse, ls=dash_dot_dotted, lw="2", color="green",
+                 label=r'$s_{\mathrm{CMB}}$. $\hat{H}_0=' + str(H0_cmb) + '$', markersize=0
                  )
-        ax_object.plot(x_sparse, s_sn_sparse, ls=long_dash_with_offset, lw="1", color="black",
-                 label=r'$s_{\mathrm{SN}}$. $\hat{H}_0=' + str(H0_sn) + '$',
+        ax_object.plot(x_sparse, s_sn_sparse, ls=long_dash_with_offset, lw="2", color="orange",
+                 label=r'$s_{\mathrm{SN}}$. $\hat{H}_0=' + str(H0_sn) + '$', markersize=0
                  )
     else:
         plt.errorbar(x=x, y=s_cmb, yerr=s_cmb_err, fmt="None",
-                     ecolor=(0, 0, 0, 0.1))
+                     ecolor=light_orange)
         plt.errorbar(x=x, y=s_sn, yerr=s_sn_err, fmt="None",
-                     ecolor=(0, 0, 0, 0.1))
-        plt.plot(x_sparse, s_cmb_sparse, ls=dash_dot_dotted, lw="1", color="black",
+                     ecolor=light_green)
+        plt.plot(x_sparse, s_cmb_sparse, ls=dash_dot_dotted, lw="1", color=green,
                  label=r'$s_{\mathrm{CMB}}$. $\hat{H}_0=' + str(H0_cmb) + '$',
                  )
-        plt.plot(x_sparse, s_sn_sparse, ls=long_dash_with_offset, lw="1", color="black",
+        plt.plot(x_sparse, s_sn_sparse, ls=long_dash_with_offset, lw="1", color=orange,
                  label=r'$s_{\mathrm{SN}}$. $\hat{H}_0=' + str(H0_sn) + '$',
                  )
     t = r"Flat $\Lambda$CDM Signal Fields." + "\nComparison Between CMB And Supernovae Measurements."
-    xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
+    xl = r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$"
     yl = r"$s(x)$"
     handles = (xl, yl, t)
     if plot_fluctuations_scale_visualization:
@@ -846,7 +890,8 @@ def show_plot(x_lim: tuple = None,
               title: str = "",
               x_label: str = "",
               y_label: str = "",
-              loc: str="upper right"):
+              loc: str="upper right",
+              disable_legend = False):
     """
     Shows the currently constructed plot.
     :param x_lim: tuple,        The limits on the x-axis.
@@ -860,7 +905,8 @@ def show_plot(x_lim: tuple = None,
     :param y_label: str,        The y label of the plot.
     :return:
     """
-    plt.legend(loc=loc)
+    if not disable_legend:
+        plt.legend(loc=loc)
     if x_lim is not None:
         plt.xlim(*x_lim)
     if y_lim is not None:
@@ -868,13 +914,14 @@ def show_plot(x_lim: tuple = None,
     if title != "":
         plt.title(title)
     if x_label != "":
-        plt.xlabel(x_label)
+        plt.xlabel(x_label, fontsize=30)
     if y_label != "":
-        plt.ylabel(y_label)
+        plt.ylabel(y_label, fontsize=30)
     if save_filename != "":
         plt.tight_layout(pad=2)
         plt.savefig(save_filename + ".png", pad_inches=1)
     if show:
+        plt.tight_layout(pad=2)
         plt.show()
     else:
         plt.clf()
@@ -939,9 +986,11 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
     xl, yl, t = plot_comparison_fields(ax_object=ax2)
 
     if dataset_used == "Union2.1":
-        ax2.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
+        # ax2.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
+        ax2.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of data")
     elif dataset_used == "DESY5":
-        ax2.vlines(x_max_des, 0, 50, linestyles='dashed', label="End of DESY5 data")
+        # ax2.vlines(x_max_des, 0, 50, linestyles='dashed', label="End of DESY5 data")
+        ax2.vlines(x_max_des, 0, 50, linestyles='dashed', label="End of data")
     else:
         pass
     current_expansion_mean, current_expansion_err = current_expansion_rate(s, s_err)
@@ -956,17 +1005,27 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
     x_reduced = remove_every_second(x, n=2)
     s_reduced = remove_every_second(s, n=2)
     s_err_reduced = remove_every_second(s_err, n=2)
+    # ax2.errorbar(x=x_reduced, y=s_reduced, yerr=s_err_reduced, color=blue, ecolor=light_blue,
+    #              label=r"\texttt{charm2}, " + dataset_used + r" data. $\hat{H}_0=" + h0_charm2 + "$", markersize=1)
     ax2.errorbar(x=x_reduced, y=s_reduced, yerr=s_err_reduced, color=blue, ecolor=light_blue,
-                 label=r"\texttt{charm2}, " + dataset_used + r" data. $\hat{H}_0=" + h0_charm2 + "$", markersize=1)
+                 label=r"\texttt{charm2}, " + dataset_used, markersize=1)
 
     if additional_samples is not None:
         for s_sample in additional_samples:
             s_red = remove_every_second(s_sample, n=2)
-            ax2.plot(x_reduced, s_red, color="black", alpha=0.5)
+            ax2.plot(x_reduced, s_red, color="orange", alpha=1, markersize=0, lw=2)
 
+
+    # Evolving dark energy analysis, comment out when done
+    # s_evolving = build_flat_evolving_dark_energy(x_reduced)
+    # plt.plot(x_reduced, s_evolving, color="black", ls="-", alpha=1, lw=2, markersize=0, label="Evolving dark energy")
+
+    special_legend_III()
+
+    # For DES: ylim=(29.5, 32.5)
     plt.tight_layout()
     show_plot(x_lim=(0, x_max_pn), y_lim=(29.5, 32.5), x_label=xl, y_label=yl, title="",
-              save_filename=filename, show=show, loc="upper left")
+              save_filename=filename, show=show, loc="upper left", disable_legend=True)
 
 
 def plot_charm1_in_comparison_fields(show: bool = False, save: bool = True):
@@ -1008,21 +1067,26 @@ def plot_charm1_in_comparison_fields(show: bool = False, save: bool = True):
     ax1.set_xlim(0, x_max_pn)
 
     xl, yl, t = plot_comparison_fields(ax_object=ax2)
-    ax2.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
-    x, s, s_err = build_charm1_agnostic(mode="des_reformulated")
+    # ax2.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of Union2.1 data")
+    ax2.vlines(x_max_union, 0, 50, linestyles='dashed', label="End of data")
+    x, s, s_err = build_charm1_agnostic(mode="union2.1")
     h0_charm1 = str(current_expansion_rate(s))
     if save:
-        filename = "data_storage/figures/charm1_des_reformulated"
+        filename = "data_storage/figures/PAPER_charm1_Union21_reformulated.png"
     else:
         filename = ""
     x_reduced = remove_every_second(x, 1)
     s_reduced = remove_every_second(s, 1)
     s_err_reduced = remove_every_second(s_err, 1)
+    # ax2.errorbar(x=x_reduced, y=s_reduced, yerr=s_err_reduced, color=blue, ecolor=light_blue,
+    #              label=r"\texttt{charm1}, Union2.1 data. $\hat{H}_0=" + h0_charm1 + "$",
+    #              markersize=1)
     ax2.errorbar(x=x_reduced, y=s_reduced, yerr=s_err_reduced, color=blue, ecolor=light_blue,
-                 label=r"\texttt{charm1}, Union2.1 data. $\hat{H}_0=" + h0_charm1 + "$",
+                 label=r"\texttt{charm1}, Union2.1",
                  markersize=1)
+    special_legend_III()
     show_plot(x_lim=(0, x_max_pn), y_lim=(29.5, 32.5), x_label=xl, y_label=yl, title="",
-              save_filename=filename, show=show, loc="upper left")
+              save_filename=filename, show=show, loc="upper left", disable_legend=True)
 
 
 def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: float, show=True, save=True,
@@ -1038,11 +1102,11 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
     :return:
     """
     x = x.field().val
-    plt.vlines(1.2, 32, 40.5, linestyles='dashed', label="End of synthetic data", color="black")
-    xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
+    plt.vlines(1.2, 25, 40.5, linestyles='dashed', label="End of data", color="black",)
+    xl = r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$"
     yl = r"$s(x)$"
     if save:
-        filename = "data_storage/figures/synthetic_ground_truth_with_reconstruction_exponential_data"
+        filename = "data_storage/figures/synthetic_ground_truth_standard_LCDM"
     else:
         filename = ""
     plt.plot(x, ground_truth, "-", color="black", lw=1, label="Synthetic ground truth")
@@ -1053,10 +1117,29 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
         signal_field_reduced = remove_every_second(reconstruction[0], n=2)
         error_field_reduced = remove_every_second(reconstruction[1], n=2)
         plt.errorbar(x=signal_domain_reduced, y=signal_field_reduced, yerr=error_field_reduced, color=blue, ecolor=light_blue,
-                     label=r"$\texttt{charm2}$ synthetic reconstruction", markersize=1)
+                     label=r"$\texttt{charm2}$ reconstruction", markersize=1)
 
-    show_plot(x_lim=(0, 1.2+0.1), y_lim=(32, 36.8), x_label=xl, y_label=yl, title="",
-              save_filename=filename, show=show, loc="upper left")
+    # Ensure the legend uses the same dash pattern
+    special_legend_I()
+
+    # Revert to: (0, 1.25) and ylim (32, 36.5) for figure limits in paper
+    show_plot(x_lim=(0, 1.25), y_lim=(31.25, 35), x_label=xl, y_label=yl, title="",
+              save_filename=filename, show=show, loc="upper left", disable_legend=True)
+
+
+def special_legend_I():
+    # Modifies some existing plot elements for better control (e.g. vertical lines without handles at the ends)
+    # Get existing legend handles and labels
+    handles, labels = plt.gca().get_legend_handles_labels()
+
+    # Modify only the dashed line's handle
+    handles = [
+        plt.Line2D([0], [0], linestyle="--", color="black", markersize=0) if label == "End of data" else h
+        for h, label in zip(handles, labels)
+    ]
+
+    # Recreate the legend with the modified handles
+    plt.legend(handles, labels, loc="upper left", fontsize=25)
 
 
 def remove_every_second(arr, n):
@@ -1093,10 +1176,10 @@ def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_p
     x_min = np.min(neg_scale_fac_mag)
     x_max = np.max(neg_scale_fac_mag)
 
-    xl = r"$x=-\mathrm{log}(a)=\mathrm{log}(1+z)$"
+    xl = r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$"
     yl = r"$\mu (x)$"
     if save:
-        filename = "data_storage/figures/synthetic_data_exponential_distribution"
+        filename = "data_storage/figures/synthetic_data_standard_LCDM"
     else:
         filename = ""
 
@@ -1110,7 +1193,8 @@ def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_p
               save_filename=filename, show=show, loc="upper left")
 
 
-def PiecewiseLinear(signal_space: RGSpace, omega_m_custom: float = None, omega_l_custom: float = None):
+def PiecewiseLinear(signal_space: RGSpace, omega_m_custom: float = None, omega_l_custom: float = None,
+                    high_curv=True):
     """
     A generative line model for a piecewise linear function with two contributions.
     Represents a LCDM model with an offset of around 30.
@@ -1121,7 +1205,10 @@ def PiecewiseLinear(signal_space: RGSpace, omega_m_custom: float = None, omega_l
     """
     x = signal_space
     expander = ContractionOperator(domain=x, spaces=None).adjoint
-    x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(5 * x.field().val)))
+    if high_curv:
+        x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(5 * x.field().val))) # component goes with ~a^-5 (fictitious for high curvature)
+    else:
+        x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(3 * x.field().val)))  # matter goes with ~a^-3
 
     omega_m, m_deviation = (1, 1)
     omega_l, l_deviation = (1, 1)
@@ -1157,7 +1244,8 @@ def plot_prior_distribution(mean_std_tuple, n_samples=50, distribution_name="nor
     plot_priorsamples(op, n_samples=n_samples)
 
 
-def plot_lognormal_histogram(mean: float, sigma: float, n_samples: int, vlines: np.array = None, save=False, show=True):
+def plot_lognormal_histogram(mean: float, sigma: float, n_samples: int, vlines: np.array = None, save=False, show=True,
+                             color = "black", mode="Lognormal"):
     """
     Plots a histogram visualizing the moment-matched lognormal transform.
     If `vlines` is provided, vertical lines will be drawn at the specified x-locations.
@@ -1171,22 +1259,32 @@ def plot_lognormal_histogram(mean: float, sigma: float, n_samples: int, vlines: 
     :param vlines:      An array consisting of x-locations at which to draw vertical lines.
     :return:
     """
-    op = LognormalTransform(mean=mean, sigma=sigma, key='Lognormal for Histogram', N_copies=0)
+    # fig = plt.figure(figsize=(10, 4))
+    if mode == "Normal":
+        print("Normal distrubution")
+        op = NormalTransform(mean=mean, sigma=sigma, key="Normal for Histogram")
+    elif mode == "Lognormal":
+        op = LognormalTransform(mean=mean, sigma=sigma, key='Lognormal for Histogram', N_copies=0)
+    elif mode == "Uniform":
+        print("Uniform distribution")
+        op = StandardUniformTransform(key='Uniform for Histogram', N_copies=0,
+                                      upper_bound=sigma, shift=mean)
     op_samples = np.array([op(s).val for s in [from_random(op.domain) for i in range(n_samples)]])
-    plt.hist(op_samples, bins=200, label=r"Lognormal with $(\mu, \sigma)=$" + f"$({mean}, {sigma})$",
-             histtype='step', facecolor='white', color="black")
+    label = rf"{mode} with $(\mu, \sigma)=$" + f"$({mean}, {sigma})$" if not (mode=="Uniform") else rf"{mode} in " + r"$\mathrm{[0,1]}$"
+    plt.hist(op_samples, bins=200, label=label,
+             histtype='step', facecolor='white', color=color)
 
     if vlines is not None:
         vline_cmb_std = vlines[0]
         vline_sn_std = vlines[1]
-        plt.vlines(vline_cmb_std, ymin=0, ymax=350, label=r"$a_{\mathrm{CMB}}$", color="black",
+        plt.vlines(vline_cmb_std, ymin=0, ymax=350, label=r"$b_{\mathrm{CMB}}$", color="black",
                    ls="--")
-        plt.vlines(vline_sn_std, ymin=0, ymax=350, label=r"$a_{\mathrm{SN}}$", color="black")
-    plt.ylabel("Samples")
-    plt.xlabel("Bins")
+        plt.vlines(vline_sn_std, ymin=0, ymax=350, label=r"$b_{\mathrm{SN}}$", color="black")
+    plt.ylabel("Frequency", fontsize=30)
+    plt.xlabel(r"Fluctuation parameter $b$", fontsize=30)
     # Right-align the text in the legend
-    plt.legend()
-    plt.xlim(0, 1)
+    special_legend_II()
+    plt.xlim(-0.1, 1.1)
     if save:
         filename = "data_storage/figures/histogram_of_lognormal_distribution"
         plt.tight_layout(pad=2)
@@ -1195,7 +1293,43 @@ def plot_lognormal_histogram(mean: float, sigma: float, n_samples: int, vlines: 
         plt.show()
 
 
-def draw_hubble_diagrams(show=False, save=False):
+def special_legend_II():
+    # Get existing legend handles and labels
+    handles, labels = plt.gca().get_legend_handles_labels()
+
+    # Define the specific replacements
+    replacements = {
+        r"$a_{\mathrm{CMB}}$": plt.Line2D([0], [0], linestyle="--", color="black", markersize=0),
+        r"$a_{\mathrm{SN}}$": plt.Line2D([0], [0], linestyle="-", color="black", markersize=0),
+        "End of data": plt.Line2D([0], [0], linestyle="--", color="black", markersize=0),
+    }
+
+    # Modify the handles based on the replacements
+    handles = [replacements[label] if label in replacements else h for h, label in zip(handles, labels)]
+
+    # Recreate the legend with the modified handles
+    plt.legend(handles, labels, fontsize=25)
+
+
+def special_legend_III():
+    # Get existing legend handles and labels
+    handles, labels = plt.gca().get_legend_handles_labels()
+
+    # Define the specific replacements
+    replacements = {
+        # "$a_{\mathrm{CMB}}$": plt.Line2D([0], [0], linestyle="--", color="black", markersize=0),
+        # "$a_{\mathrm{SN}}$": plt.Line2D([0], [0], linestyle="-", color="black", markersize=0),
+        "End of data": plt.Line2D([0], [0], linestyle="--", color=blue, markersize=0),
+    }
+
+    # Modify the handles based on the replacements
+    handles = [replacements[label] if label in replacements else h for h, label in zip(handles, labels)]
+
+    # Recreate the legend with the modified handles
+    plt.legend(handles, labels)
+
+
+def draw_hubble_diagrams(show=False, save=False, only_show_hist=False):
     z_u, mu_u, covariance_u = read_data_union()
     z_p, mu_p, _ = read_data_pantheon()
     z_d, mu_d, _ = read_data_des()
@@ -1203,14 +1337,16 @@ def draw_hubble_diagrams(show=False, save=False):
     convert_to_x = lambda z: np.log(1+z)
     x_u, x_p, x_d = [convert_to_x(z) for z in [z_u, z_p, z_d]]
 
-    plt.subplot(2, 1, 1)
 
     min_redshift = np.log(1+0)
     max_redshift = np.log(1+2.26)
 
-    n_u, bins_u, _ = plt.hist(x_u, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="-")
-    n_p, bins_p, _ = plt.hist(x_p, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="")
-    n_d, bins_d, _ = plt.hist(x_d, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="")
+    if not only_show_hist:
+        plt.subplot(2, 1, 1)
+
+    n_u, bins_u, _ = plt.hist(x_u, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="-", color=(0,0,0,0))
+    n_p, bins_p, _ = plt.hist(x_p, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="", color=(0,0,0,0))
+    n_d, bins_d, _ = plt.hist(x_d, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="", color=(0,0,0,0))
 
     # Manually create step-like plot with constant height over each bin
     bin_centers_u = np.repeat(bins_u, 2)[1:-1]
@@ -1228,25 +1364,27 @@ def draw_hubble_diagrams(show=False, save=False):
     bin_centers_d = np.insert(bin_centers_d, 0, 0)  # Insert 0 at the beginning
     n_repeated_d = np.insert(n_repeated_d, 0, 0)  # Insert 0 at the beginning
 
-    plt.plot(bin_centers_u, n_repeated_u, linestyle="-", markersize=0, color="black", lw=0.5,
+    plt.plot(bin_centers_u, n_repeated_u, linestyle="-", markersize=0, color="black", lw=1,
              label="Union2.1")
-    plt.plot(bin_centers_p, n_repeated_p, linestyle="--", markersize=0, color="black", lw=0.5, dashes=[10, 5],
+    plt.plot(bin_centers_p, n_repeated_p, linestyle="--", markersize=0, color="black", lw=1, dashes=[8, 5],
              label="Pantheon+")
-    plt.plot(bin_centers_d, n_repeated_d, linestyle="-.", markersize=0, color="black", lw=0.5, dashes=[20, 15, 1, 1],
+    plt.plot(bin_centers_d, n_repeated_d, linestyle="-.", markersize=0, color="black", lw=1, dashes=[20, 8],
              label="DESY5")
+    # dashes for desy5 was: dashes=[20, 15, 1, 1]
     plt.ylabel("Number of SN")
     plt.legend()
     plt.xlim(min_redshift-0.07, max_redshift+0.07)
 
-    plt.subplot(2, 1, 2)
-    plt.plot(x_u, mu_u, marker="o", lw=0,  markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
-             label="Union2.1",)
-    plt.plot(x_p, mu_p, marker="s", lw=0, markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
-             label="Pantheon+")
-    plt.plot(x_d, mu_d, marker="D", lw=0, markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
-             label="DESY5")
-    plt.xlabel(r"$x=\mathrm{log}(1+z)$")
-    plt.ylabel(r"$\mu$")
+    if not only_show_hist:
+        plt.subplot(2, 1, 2)
+        plt.plot(x_u, mu_u, marker="o", lw=0,  markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
+                 label="Union2.1",)
+        plt.plot(x_p, mu_p, marker="s", lw=0, markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
+                 label="Pantheon+")
+        plt.plot(x_d, mu_d, marker="D", lw=0, markerfacecolor='none', markeredgecolor='black', markeredgewidth=0.5,
+                 label="DESY5")
+        plt.ylabel(r"$\mu$")
+    plt.xlabel(r"$x=\mathrm{ln}(1+z)$")
     plt.legend()
     plt.xlim(min_redshift-0.07, max_redshift+0.07)
 
@@ -1380,8 +1518,362 @@ def calculate_approximate_mode(posterior_realizations_list, padding_operator, op
     return pointwise_mode(posterior_samples_cleaned)
 
 
+def plot_prior_cfm_samples(op, n, x):
+    """
+
+    :param op:  The cfm
+    :param n:   Number of samples to plot
+    :param x:   The field over which to plot the prior samples
+    :return:
+    """
+    samples = list(op(from_random(op.domain)) for _ in range(n))
+    fields = [sample.val for sample in samples]
+    h = np.array(fields).flatten()
+    abs_min, abs_max = (np.min(h), np.max(h))
+    for prior_field in samples:
+        if max(prior_field.val) < 32.1:
+            plt.plot(x.field().val, prior_field.val, lw=2, color=(0,0,0,0.6), markersize=0, ls="-")
+    plt.ylim(29.5, 32.2)
+    plt.xlabel(r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$")
+    plt.ylabel("Prior samples $s(x)$")
+    plt.tight_layout()
+    plt.savefig("data_storage/figures/PAPER_prior_cfm_samples.png")
+    plt.show()
+
+
+def posterior_parameters(posterior_samples, signal_model, upper_bound_on_fluct = None):
+    """
+    Finds the posterior statistics for the model parameters from the latent variables xi by getting and analyzing
+    the samples returned by the minimize KL function.
+
+    The forward model has fixed distributions for the hyperparameters. The priors on the latent variables xi that
+    are propagated to build the fluctuation, loglogavgslope etc., are standard normal Gaussians. But, after the KL
+    divergence runs, the xi's have a non-Gaussian posterior distribution, that lead to non-Gaussian posteriors for
+    the model parameters. The model parameters are still gotten through the formula
+
+    a = mu + sigma * xi
+
+    But if xi is not a standard normal variable, a will not be a normal distribution.
+
+    From optimize KL you get `posterior_samples`:
+
+        posterior_samples = ift.optimize_kl(likelihood_energy=likelihood_energy,
+                                            ... bla bla bla
+
+
+    These are `MultiFields` that contain the domain and latent (harmonic) xi values for the different model parameters:
+
+        # Make `posterior_samples` iterable:
+        poster_samples_list = list(posterior_samples.local_iterator())
+
+        # grab one and print:
+        mySample = posterior_samples_list[0]
+        print(mySample)
+
+        >> MultiField
+
+        print(mySample.domain)
+
+        >> fluctuations: DomainTuple, len: 0
+                line model slope: DomainTuple, len: 0
+                line model y-intercept: DomainTuple, len: 0
+                loglogavgslope: DomainTuple, len: 0
+                xi: DomainTuple, len: 1
+                * RGSpace(shape=(8192,), distances=(np.float64(0.41689683388895465),), harmonic=True)
+
+        print(mySample.val)
+
+        >> {'fluctuations': array(0.34721649),
+            'line model slope': array(0.21637945),
+            'line model y-intercept': array(0.25693888),
+            'loglogavgslope': array(-0.82337088),
+            'xi': array([ 0.87307418,  2.10056923,  0.21904298, ...,  1.60350815,
+                         0.46102179, -3.99240859], shape=(8192,))}
+
+
+    Now, we get the actual posterior FIELD values by switching from the harmonic to the real domain by doing
+
+        posterior_field_samples = posterior_samples.iterator(s),
+
+    where s is our signal model (e.g. a CFM). The signal model (an operator with an apply method) is applied onto
+    each harmonic sample. Somewhere along the operator chain, values for the model parameters must be computed by
+    NIFTy.
+
+    We can identify the values by considering that in our specific case:
+
+        loglogavgslope  is from a        normal distribution        and is a scalar
+        line slope      is from a        normal distribution        and is a scalar
+        line y-offset   is from a        normal distribution        and is a scalar
+        fluctuations    is from a        lognormal distribution     and is a scalar
+        signal xi_s     is from a        normal distribution        and is an array
+
+    So, IF during the operator chain, the apply method of `LognormalTransform` or `NormalTransform` is called
+    five times, it is due to these parameters. In case of `NormalTransform` the last operation done is the
+    addition (`Adder` class in `adder.py`) of the mean. In case of `LognormalTransform` it is the
+    pointwise exponentiation found in `_FunctionApplier` class in the `operator.py` (iff ` self._funcname` == exp).
+
+    The model parameters can be gotten like this and the user may then guess which parameter is which based on the
+    value of the parameter.  ACTUALLY no!! The adder appear 100% according to the order of the parameters in the
+    dictionary of the cfm parameters / line model parameters
+
+    The order of the calculated parameter models I THINK is equal to their order as defined in the parameter dictionaries.
+
+    I get the string output of the terminal to do this.
+
+    At the end, you get something like this:
+
+    posterior_parameters_dict = {
+    'fluctuations': [
+        0.20401470733786994, 0.47579091768502313 ...]}
+
+    IMPORTANT: In order for this function to work the following two print statements are needed:
+
+    File: nifty8 > operators > adder.py
+    Print statement: print((x + self._a).val, ";")
+    Where: In the apply method of the Adder class directly before returning
+
+    File: nifty8 > operators > operator.py
+    Print statement: print("Fluctuations: ", res.val, ";")
+    Where: In the apply method of the _FunctionApplier class directly before returning
+
+    File: nifty8 > operators > normal_operators.py
+    Edit: Draw log-normal transform with the help of NormalTransform2, which is a copy of NormalTransform that employs
+    Adder2 class, a copy of the Adder class without the aforementioned print statement.
+
+    File nifty8 > operators > adder.py:
+    Edit: Create a copy of the adder class called `Adder2` that does not contain any print statements.
+
+
+    :parameter custom_ptw       A string like "exp" or "CDF" which is searched for in the log string and handles
+                                the pointwise manipulation of a PDF.
+
+
+    :return:
+    """
+
+    import io
+    import contextlib
+
+    def construct_real_space_samples(post_samples, s):
+        list(post_samples.iterator(s))  # Nifty8 Field instances
+
+    f = io.StringIO()
+    with contextlib.redirect_stdout(f):
+        construct_real_space_samples(posterior_samples, signal_model)
+
+    output = f.getvalue()
+    raw = output.split(";")
+
+    # remove unnecessary line breaks
+    for index, el in enumerate(raw):
+        raw[index] = el.replace("\n", " ")
+        if raw[index] == " ":
+            raw.pop(index)
+
+    # remove xi_s lists
+    for idx, entry in enumerate(raw):
+        if "[" in entry and "]" in entry:
+            raw.pop(idx)
+
+    fluctuations_list = []
+    # find, store and remove all fluctuation parameters
+    for idx, entry in enumerate(raw):
+        if "Fluctuations" in entry:
+            value = entry.split(":")[1]
+            fluctuations_list.append(float(value))
+            raw.pop(idx)
+
+    if upper_bound_on_fluct is not None:
+        fluctuations_list = [upper_bound_on_fluct * el for el in fluctuations_list]
+
+    loglogavgslope_list = []
+    line_slope_list = []
+    line_offset_list = []
+    # assume the leftover elements are in the order of `loglogavgslope`, `line slope`, `line offset`
+    lists = [loglogavgslope_list, line_slope_list, line_offset_list]
+    for i, element in enumerate(raw):
+        lists[i % 3].append(element)
+
+
+    # Now turn everything into floats
+    loglogavgslope_list = [float(el) for el in loglogavgslope_list]
+    line_slope_list = [float(el) for el in line_slope_list]
+    line_offset_list = [float(el) for el in line_offset_list]
+
+    # Construct a dictionary:
+    posterior_parameters_dict = {
+        "fluctuations": fluctuations_list,
+        "loglogavgslope": loglogavgslope_list,
+        "line slope": line_slope_list,
+        "line offset": line_offset_list,
+    }
+
+    return posterior_parameters_dict
+
+
+def visualize_posterior_histograms(posterior_parameters_dict):
+    from scipy.stats import norm, lognorm
+    # Set up a 2x2 grid of subplots
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+
+    # Flatten axes array for easy iteration
+    axes = axes.flatten()
+
+    # List of parameter names
+    parameter_names = list(posterior_parameters_dict.keys())
+
+    for i, param in enumerate(parameter_names):
+        # Get the values for the current parameter
+        values = posterior_parameters_dict[param]
+
+        # Plot histogram for each parameter
+        axes[i].hist(values, bins=20, color='skyblue', edgecolor='black', density=True, label=f"Posterior samples")
+
+        # Overlay the appropriate analytic prior distribution
+        if param == "loglogavgslope":
+            # Prior: Vertical line at -4 for `loglogavgslope`
+            axes[i].axvline(x=-4, color='red', linestyle='--', label="Prior")
+
+        elif param == "fluctuations":
+            # Uniform distribution prior
+            x = np.linspace(0, 1, 1000)
+            pdf = np.ones_like(x) / (max(values) - min(values))
+            axes[i].plot(x, pdf, color='black', label="Prior:")
+            axes[i].vlines(0.6, 0, 5, linestyle='--', color='red', label="Initial position")
+            axes[i].set_xlim(-0.1, 1.1)
+            axes[i].set_ylim(0, 6)
+
+        elif param == "line slope":
+            # Prior: Normal with mu=2 and sigma=5 for `slope of line`
+            mu, sigma = 2, 5
+            x = np.linspace(min(values)-5, max(values)+5, 1000)
+            pdf = norm.pdf(x, mu, sigma)*np.max(values)
+            axes[i].plot(x, pdf, color='black', label="Prior")
+
+        elif param == "line offset":
+            # Prior: Normal with mu=30 and sigma=10 for `offset of line`
+            mu, sigma = 30, 10
+            x = np.linspace(min(values)-10, max(values)+10, 1000)
+            pdf = norm.pdf(x, mu, sigma)*np.max(values)
+            axes[i].plot(x, pdf, color='black', label="Prior")
+
+        # Add labels and title
+        axes[i].set_xlabel(f"Value of {param}")
+        axes[i].set_ylabel("Frequency")
+        axes[i].legend(loc="upper left")
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+    plt.show()
+
+
+def construct_initial_position(n_pix_ext, distances, fluctuations):
+    """
+    Constructs a MultiField that can be fed into `initial_position` of optimize_kl. The MultiField's structure is like
+    this:
+
+    domain:
+    ---------
+    MultiDomain:
+      fluctuations: DomainTuple, len: 0
+      line model slope: DomainTuple, len: 0
+      line model y-intercept: DomainTuple, len: 0
+      loglogavgslope: DomainTuple, len: 0
+      xi: DomainTuple, len: 1
+      * RGSpace(shape=(8192,), distances=(np.float64(0.41671913321298615),), harmonic=True)
+
+    val:
+    ---------
+    {'fluctuations': array(-0.1528622), 'line model slope': array(0.09607211),
+     'line model y-intercept': array(0.21449712), 'loglogavgslope': array(3.96641546e-07),
+     'xi': array([ 7.12659478e-08, -4.29667036e-01,  2.03453633e+00, ..., 7.98430340e-01,  1.77930610e-01,
+                   1.33588287e-01], shape=(8192,))}
+
+    For the real data inference, we expect the fluctuations to be around ~ 0.14. Indeed,
+
+        cdf(-1.05) = 0.1468590563758959,
+
+    with cdf = scipy.stats.norm.cdf, so we choose xi_fluct = -1.05.
+
+    loglogavgslope in signal space = -4 corresponds to xi_loglog = 3.96641546e-07
+
+    line model slope and offset are set according to the mean xi's of posterior Union2.1 samples.
+
+    The signal xi_s are drawn from a standard random distribution of the length of the extended signal space.
+
+    The domain of the xi_s variable is:
+
+        * RGSpace(shape=(8192,), distances=(np.float64(0.41750518696035904),), harmonic=True)
+
+    (note its in harmonic space so it needs to be the co-space of the regular RG space).
+
+    For scalar values, the domain is a simple scalar domain.
+
+    One last note: Here, i am droing the xi_s values from a simple standard normal distribution.
+    But in reality, the xi_s values seem to have some structure. To see this, you may do:
+
+    posterior_samples, final_pos = ift.optimize_kl(return_final_pos = True etc...)
+    plt.plot(final_pos.val["xi"])
+    plt.show()
+
+    UPDATE: Now I am using the mean xi's array of posterior Union2.1 samples.
+
+    :parameter: n_pix_ext      : The number of points of the extended signal domain.
+    :parameter: distances:     : The size of the pixels
+    :parameter: fluctuations:  : The wished point-wise std of the field.
+    :return:
+    """
+    import nifty8 as ift
+
+    scalar_domain = ift.DomainTuple.scalar_domain()
+    harmonic_RGspace = ift.RGSpace(n_pix_ext, distances=distances).get_default_codomain()
+
+    # xi_values = norm.rvs(size=n_pix_ext)
+    xi_values = np.loadtxt("data_storage/raw_data/mean_posterior_union_xi_s.txt")
+
+    xi_fluct = norm.ppf(fluctuations)
+
+    print("\nConstructing initial position... The fluctuation parameter is around ", norm.cdf(xi_fluct))
+
+    fluct = ift.makeField(scalar_domain, arr=np.array(xi_fluct))
+    pow_slope = ift.makeField(scalar_domain, arr=np.array(3.96641546e-07))
+    line_slope = ift.makeField(scalar_domain, arr=np.array(-0.12847809050927028))
+    line_offset = ift.makeField(scalar_domain, arr=np.array(-0.012743781703426963))
+    xi_s = ift.makeField(harmonic_RGspace, xi_values)
+
+    init_pos_dict = {"fluctuations": fluct,
+                     "line model slope": line_slope,
+                     "line model y-intercept": line_offset,
+                     "loglogavgslope": pow_slope,
+                     "xi": xi_s}
+
+    init_MultiField = ift.MultiField.from_dict(dct = init_pos_dict)
+
+    return init_MultiField
+
+
 # plot_h0_comparisons(save=True, show=False)
 # plot_charm1_in_comparison_fields(save=True, show=True)
-# draw_hubble_diagrams(save=True)
-# plot_comparison_fields(plot_fluctuations_scale_visualization=True)
-# plot_lognormal_histogram(mean=.07, sigma=.007, n_samples=5000, vlines=[0.147, 0.14], save=False, show=True)
+# draw_hubble_diagrams(save=True, show=True, only_show_hist=True)
+# fig, ax = plt.subplots()
+# plot_comparison_fields(plot_fluctuations_scale_visualization=False, ax_object=ax)
+# plt.xlabel(r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$", fontsize=30)
+# plt.ylabel("$s(x)$", fontsize=30)
+# plt.legend(fontsize=25)
+# plt.xlim(0, 1.2)
+# plt.ylim(29.5, 32.5)
+# plt.tight_layout()
+# plt.savefig("PAPER_comparison_fields.png")
+# plt.show()
+ms = [-0.5, ]  # means
+ss = [1, ]  # sigmas
+colors = ["black", "green"]
+for m, s, c in zip(ms, ss, colors):
+    plot_lognormal_histogram(mean=m, sigma=s, n_samples=7000, vlines=[0.147, 0.14], save=False, show=False,
+                             color=c, mode="Uniform")
+
+plt.ylim(0, 100)
+plt.xlim(0, 1)
+plt.tight_layout()
+# plt.savefig("PAPER_fluctuation_distribution.png")
+plt.show()

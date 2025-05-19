@@ -1,0 +1,753 @@
+Charm2 inference run on the 2025-04-27 10:24:17. Mode: synthetic
+Length of dataset: 500
+Time took in minutes: 1.59
+
+Exponential data.
+Standard LCDM in Omega_m, l = 0.3, 0.7 and matter evolution a^-3.
+Fluctuations from a uniform in interval (0,0.5).
+No initial position applied.
+
+Model parameters: cfm_{'offset_mean': 0, 'offset_std': None, 'loglogavgslope': (-4, 1e-16), 'fluctuations': (0.2, 0.14), 'asperity': None, 'flexibility': None}_lm_{'slope': (2, 5), 'intercept': (30, 10)}
+
+Number of global KL minimization runs: 32
+
+Finished index: 0
+Current datetime: 2025-04-27 10:22:44.266582
+Task 0
+* apply: 		      0
+* apply Linearization: 	    656
+* Jacobian: 		    951
+* Adjoint Jacobian: 	   1152
+
+Finished index: 1
+Current datetime: 2025-04-27 10:22:46.054958
+Task 0
+* apply: 		      0
+* apply Linearization: 	    345
+* Jacobian: 		    686
+* Adjoint Jacobian: 	    828
+
+Finished index: 2
+Current datetime: 2025-04-27 10:22:49.465201
+Task 0
+* apply: 		      0
+* apply Linearization: 	    729
+* Jacobian: 		   1449
+* Adjoint Jacobian: 	   1743
+
+Finished index: 3
+Current datetime: 2025-04-27 10:22:52.939707
+Task 0
+* apply: 		      0
+* apply Linearization: 	    737
+* Jacobian: 		   1483
+* Adjoint Jacobian: 	   1785
+
+Finished index: 4
+Current datetime: 2025-04-27 10:22:55.648056
+Task 0
+* apply: 		      0
+* apply Linearization: 	    485
+* Jacobian: 		   1211
+* Adjoint Jacobian: 	   1471
+
+Finished index: 5
+Current datetime: 2025-04-27 10:22:58.388288
+Task 0
+* apply: 		      0
+* apply Linearization: 	    492
+* Jacobian: 		   1253
+* Adjoint Jacobian: 	   1520
+
+Finished index: 6
+Current datetime: 2025-04-27 10:23:01.506023
+Task 0
+* apply: 		      0
+* apply Linearization: 	    609
+* Jacobian: 		   1316
+* Adjoint Jacobian: 	   1610
+
+Finished index: 7
+Current datetime: 2025-04-27 10:23:04.459512
+Task 0
+* apply: 		      0
+* apply Linearization: 	    576
+* Jacobian: 		   1281
+* Adjoint Jacobian: 	   1572
+
+Finished index: 8
+Current datetime: 2025-04-27 10:23:07.509429
+Task 0
+* apply: 		      0
+* apply Linearization: 	    537
+* Jacobian: 		   1405
+* Adjoint Jacobian: 	   1717
+
+Finished index: 9
+Current datetime: 2025-04-27 10:23:10.274810
+Task 0
+* apply: 		      0
+* apply Linearization: 	    495
+* Jacobian: 		   1245
+* Adjoint Jacobian: 	   1515
+
+Finished index: 10
+Current datetime: 2025-04-27 10:23:13.114145
+Task 0
+* apply: 		      0
+* apply Linearization: 	    496
+* Jacobian: 		   1274
+* Adjoint Jacobian: 	   1545
+
+Finished index: 11
+Current datetime: 2025-04-27 10:23:16.069911
+Task 0
+* apply: 		      0
+* apply Linearization: 	    513
+* Jacobian: 		   1341
+* Adjoint Jacobian: 	   1629
+
+Finished index: 12
+Current datetime: 2025-04-27 10:23:18.836330
+Task 0
+* apply: 		      0
+* apply Linearization: 	    491
+* Jacobian: 		   1233
+* Adjoint Jacobian: 	   1499
+
+Finished index: 13
+Current datetime: 2025-04-27 10:23:21.647820
+Task 0
+* apply: 		      0
+* apply Linearization: 	    495
+* Jacobian: 		   1259
+* Adjoint Jacobian: 	   1529
+
+Finished index: 14
+Current datetime: 2025-04-27 10:23:25.374475
+Task 0
+* apply: 		      0
+* apply Linearization: 	    829
+* Jacobian: 		   1562
+* Adjoint Jacobian: 	   1866
+
+Finished index: 15
+Current datetime: 2025-04-27 10:23:28.173680
+Task 0
+* apply: 		      0
+* apply Linearization: 	    492
+* Jacobian: 		   1247
+* Adjoint Jacobian: 	   1514
+
+Finished index: 16
+Current datetime: 2025-04-27 10:23:31.626420
+Task 0
+* apply: 		      0
+* apply Linearization: 	    731
+* Jacobian: 		   1465
+* Adjoint Jacobian: 	   1761
+
+Finished index: 17
+Current datetime: 2025-04-27 10:23:35.252222
+Task 0
+* apply: 		      0
+* apply Linearization: 	    799
+* Jacobian: 		   1547
+* Adjoint Jacobian: 	   1851
+
+Finished index: 18
+Current datetime: 2025-04-27 10:23:38.042741
+Task 0
+* apply: 		      0
+* apply Linearization: 	    493
+* Jacobian: 		   1257
+* Adjoint Jacobian: 	   1525
+
+Finished index: 19
+Current datetime: 2025-04-27 10:23:41.492728
+Task 0
+* apply: 		      0
+* apply Linearization: 	    736
+* Jacobian: 		   1478
+* Adjoint Jacobian: 	   1779
+
+Finished index: 20
+Current datetime: 2025-04-27 10:23:44.396750
+Task 0
+* apply: 		      0
+* apply Linearization: 	    500
+* Jacobian: 		   1272
+* Adjoint Jacobian: 	   1547
+
+Finished index: 21
+Current datetime: 2025-04-27 10:23:47.182671
+Task 0
+* apply: 		      0
+* apply Linearization: 	    489
+* Jacobian: 		   1240
+* Adjoint Jacobian: 	   1504
+
+Finished index: 22
+Current datetime: 2025-04-27 10:23:50.053889
+Task 0
+* apply: 		      0
+* apply Linearization: 	    507
+* Jacobian: 		   1302
+* Adjoint Jacobian: 	   1584
+
+Finished index: 23
+Current datetime: 2025-04-27 10:23:52.848337
+Task 0
+* apply: 		      0
+* apply Linearization: 	    493
+* Jacobian: 		   1248
+* Adjoint Jacobian: 	   1516
+
+Finished index: 24
+Current datetime: 2025-04-27 10:23:55.606668
+Task 0
+* apply: 		      0
+* apply Linearization: 	    486
+* Jacobian: 		   1219
+* Adjoint Jacobian: 	   1480
+
+Finished index: 25
+Current datetime: 2025-04-27 10:23:59.195434
+Task 0
+* apply: 		      0
+* apply Linearization: 	    789
+* Jacobian: 		   1498
+* Adjoint Jacobian: 	   1792
+
+Finished index: 26
+Current datetime: 2025-04-27 10:24:01.938462
+Task 0
+* apply: 		      0
+* apply Linearization: 	    486
+* Jacobian: 		   1220
+* Adjoint Jacobian: 	   1481
+
+Finished index: 27
+Current datetime: 2025-04-27 10:24:05.486465
+Task 0
+* apply: 		      0
+* apply Linearization: 	    736
+* Jacobian: 		   1484
+* Adjoint Jacobian: 	   1785
+
+Finished index: 28
+Current datetime: 2025-04-27 10:24:08.250351
+Task 0
+* apply: 		      0
+* apply Linearization: 	    492
+* Jacobian: 		   1244
+* Adjoint Jacobian: 	   1511
+
+Finished index: 29
+Current datetime: 2025-04-27 10:24:11.261721
+Task 0
+* apply: 		      0
+* apply Linearization: 	    520
+* Jacobian: 		   1386
+* Adjoint Jacobian: 	   1681
+
+Finished index: 30
+Current datetime: 2025-04-27 10:24:14.214775
+Task 0
+* apply: 		      0
+* apply Linearization: 	    510
+* Jacobian: 		   1323
+* Adjoint Jacobian: 	   1608
+
+Finished index: 31
+Current datetime: 2025-04-27 10:24:17.160712
+Task 0
+* apply: 		      0
+* apply Linearization: 	    505
+* Jacobian: 		   1308
+* Adjoint Jacobian: 	   1588
+
+
+
+Finished index: 0
+Current datetime: 2025-04-27 10:22:44.112403
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.1        500
+Latent space
+  fluctuations            0.6 ± 1.1    -0.2 ± 0.8          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.1 ± 0.0          1
+  loglogavgslope          0.9 ± 0.5     0.0 ± 1.0          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 1
+Current datetime: 2025-04-27 10:22:45.955789
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            1.0 ± 1.3    -0.1 ± 1.0          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.1 ± 0.0          1
+  loglogavgslope          0.4 ± 0.8     0.0 ± 0.7          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 2
+Current datetime: 2025-04-27 10:22:49.369888
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0    -0.0 ± 0.0        500
+Latent space
+  fluctuations            0.9 ± 1.8    -0.1 ± 1.0          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.1 ± 0.0          1
+  loglogavgslope          0.6 ± 0.8     0.0 ± 0.8          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 3
+Current datetime: 2025-04-27 10:22:52.824121
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.1        500
+Latent space
+  fluctuations            0.5 ± 0.7    -0.1 ± 0.7          1
+  line model slope        0.0 ± 0.0    -0.0 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.1 ± 0.0          1
+  loglogavgslope          1.1 ± 1.4     0.0 ± 1.1          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 4
+Current datetime: 2025-04-27 10:22:55.554481
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.9 ± 1.3    -0.0 ± 1.0          1
+  line model slope        0.0 ± 0.0    -0.0 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.1 ± 0.0          1
+  loglogavgslope          0.7 ± 0.8     0.0 ± 0.9          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 5
+Current datetime: 2025-04-27 10:22:58.292442
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.4 ± 0.4    -0.0 ± 0.6          1
+  line model slope        0.0 ± 0.0    -0.0 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.1 ± 0.0          1
+  loglogavgslope          1.8 ± 2.9     0.0 ± 1.4          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 6
+Current datetime: 2025-04-27 10:23:01.407288
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.7 ± 1.6    -0.1 ± 0.9          1
+  line model slope        0.0 ± 0.0    -0.0 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.2 ± 2.3     0.0 ± 1.1          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 7
+Current datetime: 2025-04-27 10:23:04.360974
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.1        500
+Latent space
+  fluctuations            0.4 ± 0.5    -0.0 ± 0.6          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.8 ± 0.7     0.0 ± 0.9          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 8
+Current datetime: 2025-04-27 10:23:07.409898
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.9 ± 1.7     0.0 ± 1.0          1
+  line model slope        0.0 ± 0.0    -0.0 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.1 ± 1.5     0.0 ± 1.1          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 9
+Current datetime: 2025-04-27 10:23:10.173596
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.5 ± 0.8    -0.0 ± 0.7          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.7 ± 1.0     0.0 ± 0.9          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 10
+Current datetime: 2025-04-27 10:23:13.011357
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.7 ± 0.8     0.1 ± 0.8          1
+  line model slope        0.0 ± 0.1    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.4 ± 1.9     0.0 ± 1.2          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 11
+Current datetime: 2025-04-27 10:23:15.968116
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.9 ± 1.5     0.0 ± 1.0          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.2          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.0 ± 1.1     0.0 ± 1.0          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 12
+Current datetime: 2025-04-27 10:23:18.708520
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.4 ± 0.6     0.1 ± 0.6          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.2          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.7 ± 1.0     0.0 ± 0.8          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 13
+Current datetime: 2025-04-27 10:23:21.545535
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.5 ± 0.8     0.0 ± 0.7          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.7 ± 0.7     0.0 ± 0.8          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 14
+Current datetime: 2025-04-27 10:23:25.274463
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            1.7 ± 3.0    -0.0 ± 1.3          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.8 ± 1.4     0.0 ± 0.9          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 15
+Current datetime: 2025-04-27 10:23:28.046377
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.7 ± 0.9     0.0 ± 0.8          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.9 ± 1.0     0.0 ± 0.9          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 16
+Current datetime: 2025-04-27 10:23:31.525514
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.7 ± 0.8     0.1 ± 0.8          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.4 ± 1.1     0.0 ± 1.2          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 17
+Current datetime: 2025-04-27 10:23:35.150411
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            1.0 ± 1.6     0.1 ± 1.0          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.0 ± 1.3     0.0 ± 1.0          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 18
+Current datetime: 2025-04-27 10:23:37.915178
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.6 ± 0.7     0.1 ± 0.8          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.7 ± 1.1     0.0 ± 0.8          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 19
+Current datetime: 2025-04-27 10:23:41.391869
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0    -0.0 ± 0.0        500
+Latent space
+  fluctuations            1.4 ± 1.8     0.0 ± 1.2          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.1 ± 1.4     0.0 ± 1.1          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 20
+Current datetime: 2025-04-27 10:23:44.293759
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.5 ± 0.5    -0.0 ± 0.7          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.0 ± 1.3     0.0 ± 1.0          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 21
+Current datetime: 2025-04-27 10:23:47.055164
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.4 ± 0.8     0.0 ± 0.7          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.9 ± 1.0     0.0 ± 1.0          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 22
+Current datetime: 2025-04-27 10:23:49.950969
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.1        500
+Latent space
+  fluctuations            0.8 ± 1.2    -0.0 ± 0.9          1
+  line model slope        0.0 ± 0.0    -0.0 ± 0.2          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.7 ± 1.2     0.0 ± 0.9          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 23
+Current datetime: 2025-04-27 10:23:52.744872
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.7 ± 0.9    -0.1 ± 0.9          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.2 ± 2.1     0.0 ± 1.1          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 24
+Current datetime: 2025-04-27 10:23:55.475533
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.1        500
+Latent space
+  fluctuations            0.8 ± 1.0    -0.0 ± 0.9          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.9 ± 1.1     0.0 ± 1.0          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 25
+Current datetime: 2025-04-27 10:23:59.090265
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.5 ± 0.5    -0.1 ± 0.7          1
+  line model slope        0.0 ± 0.0    -0.0 ± 0.2          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.6 ± 2.2     0.0 ± 1.3          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 26
+Current datetime: 2025-04-27 10:24:01.834284
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.6 ± 1.0    -0.1 ± 0.8          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.2 ± 1.8     0.0 ± 1.1          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 27
+Current datetime: 2025-04-27 10:24:05.380742
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.5 ± 0.7    -0.1 ± 0.7          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.5 ± 1.5     0.0 ± 1.2          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 28
+Current datetime: 2025-04-27 10:24:08.148653
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.3 ± 0.4    -0.1 ± 0.6          1
+  line model slope        0.0 ± 0.1    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.1 ± 2.2     0.0 ± 1.1          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 29
+Current datetime: 2025-04-27 10:24:11.156282
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.1        500
+Latent space
+  fluctuations            0.6 ± 0.5    -0.1 ± 0.8          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          0.9 ± 0.8     0.0 ± 1.0          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 30
+Current datetime: 2025-04-27 10:24:14.106844
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.0        500
+Latent space
+  fluctuations            0.4 ± 0.6    -0.0 ± 0.7          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.6 ± 1.7     0.0 ± 1.3          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+Finished index: 31
+Current datetime: 2025-04-27 10:24:17.053354
+============================================================
+                         reduced χ²          mean      # dof
+------------------------------------------------------------
+Data residuals
+  <None>                  0.9 ± 0.0     0.0 ± 0.1        500
+Latent space
+  fluctuations            1.0 ± 1.2    -0.0 ± 1.0          1
+  line model slope        0.0 ± 0.0    -0.1 ± 0.1          1
+  line model y-intercept  0.0 ± 0.0     0.2 ± 0.0          1
+  loglogavgslope          1.2 ± 1.2     0.0 ± 1.1          1
+  xi                      1.0 ± 0.0     0.0 ± 0.0       8192
+============================================================
+
+
+

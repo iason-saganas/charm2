@@ -4,7 +4,7 @@ from time import time
 
 def main_cosmological(data_to_use="Union2.1"):
 
-    likelihood, d, neg_a_mag, arguments, x, X, s, _ = cosmological_likelihood(data_to_use=data_to_use)
+    likelihood, d, neg_a_mag, arguments, x, X, s, initial_pos, _ = cosmological_likelihood(data_to_use=data_to_use)
 
     # For plotting purposes:
     z_p, mu_p, _ = read_data_pantheon()
@@ -14,8 +14,7 @@ def main_cosmological(data_to_use="Union2.1"):
 
     print(f"\nUsing {data_to_use} data.\n")
 
-    # global_iterations = 32
-    global_iterations = 6  # FOR TESTING PURPOSES. REVERT BACK TO 32
+    global_iterations = 32
 
     inference_start = time()
 
@@ -27,7 +26,10 @@ def main_cosmological(data_to_use="Union2.1"):
                                         nonlinear_sampling_minimizer=geoVI_sampling_minimizer,
                                         return_final_position=False,
                                         resume=False,
-                                        output_directory=f"data_storage/pickled_inferences/cache_{data_to_use}")
+                                        output_directory=f"data_storage/pickled_inferences/cache_{data_to_use}",
+                                        initial_position=initial_pos,
+                                        plot_energy_history=True
+                                        )
 
     inference_end = time()
     inference_duration = inference_end - inference_start

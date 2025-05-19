@@ -10,6 +10,7 @@ def main_synthetic(plot_ground_truth, plot_mock_data):
 
     # Construct random ground truth domain field
     ground_truth_model = ift.from_random(s_g.domain)
+
     # Construct ground truth field
     ground_truth_field = s_g(ground_truth_model)
     # Construct synthetic data
@@ -17,10 +18,10 @@ def main_synthetic(plot_ground_truth, plot_mock_data):
 
     # if wished, add a systematic increase / decrease of SN mags at high redshift
 
-    bump_idx = np.where(neg_a_mag > 0.44)
+    bump_idx = np.where(neg_a_mag < 0.44)
     bump_vals = np.zeros_like(d.val)
-    # bump_vals[bump_idx] = 0.5
-    bump_vals[bump_idx] = -0.04
+    bump_vals[bump_idx] = 0
+    # bump_vals[bump_idx] = +0.2  # systematically increase / decrease low/high redshift moduli
     d = d + ift.Field.from_raw(d.domain, arr=bump_vals)
 
     # Plot signal field ground truth, as well as data realizations
@@ -32,33 +33,38 @@ def main_synthetic(plot_ground_truth, plot_mock_data):
                             mu_array=np.concatenate((mu_p, mu_u)), save=False, show=plot_mock_data)
 
     likelihood_energy = ift.GaussianEnergy(d, N.inverse) @ R
-    global_iterations = 6
+    global_iterations = 32
 
     inference_start = time()
 
-    posterior_samples = ift.optimize_kl(likelihood_energy=likelihood_energy,
+    posterior_samples, final_pos = ift.optimize_kl(likelihood_energy=likelihood_energy,
                                         total_iterations=global_iterations,
                                         n_samples=kl_sampling_rate,
                                         kl_minimizer=descent_finder,
                                         sampling_iteration_controller=ic_sampling_lin,
                                         nonlinear_sampling_minimizer=geoVI_sampling_minimizer,
                                         output_directory="data_storage/pickled_inferences/temp",
-                                        return_final_position=False,
-                                        resume=False)
+                                        return_final_position=True,
+                                        resume=False,
+                                        initial_position=initial_pos
+                                        ) # data always changes so it doesn't make sense to resume
+
+
 
     inference_end = time()
     inference_duration = inference_end - inference_start
 
     now = get_datetime()
     # Save the inference run
-    pickle_me_this(f"synthetic/{now}", posterior_samples)
+    pickle_me_this(f"synthetic/{now}", [posterior_samples, d, ground_truth_field, s, neg_a_mag])
 
     store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(d.val),
-                    inference_type='synthetic', signal_model_param=arguments, global_kl_iterations=global_iterations)
+                    inference_type='synthetic', signal_model_param=arguments, global_kl_iterations=global_iterations,
+                    data_storage_dir_name="temp")
 
     posterior_realizations_list = posterior_samples
     s_mean, s_var = posterior_realizations_list.sample_stat(s)
 
     plot_synthetic_ground_truth(x=x, ground_truth=X.adjoint(ground_truth_field).val, x_max_pn=np.max(np.log(1+z_p)),
-                                reconstruction=(X.adjoint(s_mean).val, np.sqrt(X.adjoint(s_var).val)), save=True,
+                                reconstruction=(X.adjoint(s_mean).val, np.sqrt(X.adjoint(s_var).val)), save=False,
                                 show=True)

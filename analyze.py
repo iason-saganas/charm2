@@ -1,7 +1,6 @@
 import urwid
 import os
 
-
 def main_menu_selection(button, index):
     boolean_array_main_menu[0] = boolean_array_main_menu[1] = False  # Set to default
     if index == 0:  # Synthetic inferences

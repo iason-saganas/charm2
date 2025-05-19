@@ -2,6 +2,8 @@ import nifty8 as ift
 from .utilitites import *
 import numpy as np
 
+from .utilitites import construct_initial_position
+
 # Defining necessary spaces, fields and operators:
 # Geometric object 'x' as signal space. The corresponding values (coordinate points) can be grabbed via x.field().val
 # Set the resolution of the signal space
@@ -12,21 +14,21 @@ import numpy as np
 # Define iteration and minimization control
 
 n_dp = 500
-neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=False)  # The negative scale factor magnitude,
+neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=True)  # The negative scale factor magnitude,
 # x = -log(a) = log(1+z)
 
 config = {
     'Signal Field Resolution': 4096,
     'Length of signal space': np.max(neg_a_mag),
-    'Fac to extend signal space by': 1.3,
+    'Fac to extend signal space by': 2,
     'Noise level': .1,
 }
 
 n_pix, x_length, x_fac, noise_level = [float(setting) for setting in config.values()]
 
 pxl_size = x_length / n_pix
-x = ift.RGSpace(n_pix, distances=pxl_size)  # The Signal space.
-x_ext = ift.RGSpace(x_fac*n_pix, distances=pxl_size)  # The extended signal space
+x = ift.RGSpace(int(n_pix), distances=pxl_size)  # The Signal space.
+x_ext = ift.RGSpace(int(x_fac*n_pix), distances=pxl_size)  # The extended signal space
 x = attach_custom_field_method(x)  # Attach `field()` method
 x_ext = attach_custom_field_method(x_ext)  # Attach `field()` method
 data_space = ift.UnstructuredDomain((n_dp,))
@@ -35,8 +37,8 @@ data_space = ift.UnstructuredDomain((n_dp,))
 args_cfm = {
     'offset_mean': 0,
     'offset_std': None,
-    'fluctuations': (.4, .2),
     'loglogavgslope': (-4, 1e-16),
+    'fluctuations': (.2, .14),
     'asperity': None,
     'flexibility': None,
 }
@@ -50,10 +52,14 @@ args_lm = {
 X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
 
 # The to-be-inferred signal on the extended domain
-s = ift.SimpleCorrelatedField(target=x_ext, **args_cfm) + LineModel(target=x_ext, args=args_lm)
+cfm = ift.SimpleCorrelatedField(target=x_ext, **args_cfm)
+line = LineModel(target=x_ext, args=args_lm)
+s = cfm + line
+
 # ift.plot_priorsamples(s)
 # The ground truth model
-s_g = PiecewiseLinear(signal_space=x_ext, omega_m_custom=0.3, omega_l_custom=2)
+# s_g = PiecewiseLinear(signal_space=x_ext, omega_m_custom=0.3, omega_l_custom=2, high_curv=True)  # for high curvature choose this and set the matter exponent to 5 instead of 3
+s_g = PiecewiseLinear(signal_space=x_ext, omega_m_custom=0.3, omega_l_custom=0.7, high_curv=False)  # Standard flat LCDM model
 
 arguments = 'cfm_' + str(args_cfm) + '_lm_' + str(args_lm)
 
@@ -76,3 +82,5 @@ geoVI_sampling_minimizer = ift.NewtonCG(ic_sampling_nl)
 ic_newton = ift.AbsDeltaEnergyController(name='Newton Descent Finder', deltaE=0.1, convergence_level=2,
                                          iteration_limit=35)
 descent_finder = ift.NewtonCG(ic_newton)
+
+initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.2)

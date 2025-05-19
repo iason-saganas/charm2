@@ -20,7 +20,7 @@ def cosmological_likelihood(data_to_use):
     config = {
         'Signal Field Resolution': 4096,  # 2**12
         'Length of signal space': np.max(np.log(1 + z)),
-        'Factor to extend signal space size by': 1.3,
+        'Factor to extend signal space size by': 2,
     }
 
     n_pix, x_length, x_fac = [float(setting) for setting in config.values()]
@@ -28,8 +28,8 @@ def cosmological_likelihood(data_to_use):
 
     pxl_size = x_length / n_pix  # bin size
 
-    x = ift.RGSpace(n_pix, distances=pxl_size)  # The signal space.
-    x_ext = ift.RGSpace(x_fac * n_pix, distances=pxl_size)  # The signal space extended by the
+    x = ift.RGSpace(int(n_pix), distances=pxl_size)  # The signal space.
+    x_ext = ift.RGSpace(int(x_fac * n_pix), distances=pxl_size)  # The signal space extended by the
     # in `config` specified factor.
 
     x = attach_custom_field_method(x)  # Attach the custom `field` method.
@@ -43,7 +43,7 @@ def cosmological_likelihood(data_to_use):
     args_cfm = {
         'offset_mean': 0,
         'offset_std': None,
-        'fluctuations': (.4, .2),
+        'fluctuations': (.2, .14),
         'loglogavgslope': (-4, 1e-16),
         'asperity': None,
         'flexibility': None,
@@ -68,18 +68,21 @@ def cosmological_likelihood(data_to_use):
 
     d = ift.Field(domain=ift.DomainTuple.make(data_space,), val=mu)
 
-    # FOR ANALYSIS OF POSSIBLE SYSTEMATIC EFFECTS. UNCOMMENT WHEN NO LONGER NEEDED:
+    initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.2)
+    # initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.6)  # TESTING PURPOSES
 
-    bump_idx = np.where(neg_a_mag > 0.44)
-    bump_vals = np.zeros_like(d.val)
-    bump_vals[bump_idx] = +0.008
+    # FOR ANALYSIS OF POSSIBLE SYSTEMATIC EFFECTS. COMMENT WHEN NO LONGER NEEDED:
+
+    # bump_idx = np.where(neg_a_mag > 0.44)
+    # bump_vals = np.zeros_like(d.val)
+    # bump_vals[bump_idx] = +0.008
 
     # bump_vals[bump_idx] = -0.04
-    d = d + ift.Field.from_raw(d.domain, arr=bump_vals)
+    # d = d + ift.Field.from_raw(d.domain, arr=bump_vals)
 
     likelihood_energy = ift.GaussianEnergy(d, N.inverse) @ R
 
-    return likelihood_energy, d, neg_a_mag, arguments, x, X, s, covariance
+    return likelihood_energy, d, neg_a_mag, arguments, x, X, s, initial_pos, covariance
 
 
 # Iteration control for `MGVI` and linear parts of the inference
