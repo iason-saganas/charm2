@@ -3,7 +3,7 @@ from data_storage.style_components.matplotlib_style import *
 
 cosmological = True
 extend = False
-data_to_analyze = "Union2.1"
+data_to_analyze = "Pantheon+"
 plot_in_signal_space = True
 plot_in_data_space = False
 if cosmological:
@@ -17,7 +17,7 @@ else:
 
 
 # samples = unpickle_me_this("real/further_analysis/desy5_3.pickle", absolute_path=False)
-samples = unpickle_me_this("real/further_analysis/overfitting_minimum/union.pickle", absolute_path=False)
+samples = unpickle_me_this("real/viper_pantheon.pickle", absolute_path=False)
 
 # plot_flat_lcdm_fields(x_max=np.max(np.log(1 + z_p)), show=True, save=False)  # Creates a plot of the comparison CMB and SN fields
 # plot_charm1_in_comparison_fields(x_max_pn=np.max(np.log(1 + z_p)), x_max_union=np.max(np.log(1+z_u)), show=False,
@@ -36,7 +36,7 @@ posterior_realizations_list = samples
 post_parameters_dict = posterior_parameters(posterior_realizations_list, signal_model=s,
                                             upper_bound_on_fluct = 1)
 
-visualize_posterior_histograms(post_parameters_dict)
+visualize_posterior_histograms(post_parameters_dict, 0.6)
 
 
 

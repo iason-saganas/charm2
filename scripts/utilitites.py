@@ -1675,27 +1675,38 @@ def posterior_parameters(posterior_samples, signal_model, upper_bound_on_fluct =
         if "[" in entry and "]" in entry:
             raw.pop(idx)
 
-    fluctuations_list = []
-    # find, store and remove all fluctuation parameters
-    for idx, entry in enumerate(raw):
-        if "Fluctuations" in entry:
-            value = entry.split(":")[1]
-            fluctuations_list.append(float(value))
-            raw.pop(idx)
+    old = False
 
-    if upper_bound_on_fluct is not None:
-        fluctuations_list = [upper_bound_on_fluct * el for el in fluctuations_list]
+    print("my raw: \n\n ", raw)
+
+    fluctuations_list = []
+
+    if old:
+        # find, store and remove all fluctuation parameters
+        for idx, entry in enumerate(raw):
+            if "Fluctuations" in entry:
+                value = entry.split(":")[1]
+                fluctuations_list.append(float(value))
+                raw.pop(idx)
+
+        if upper_bound_on_fluct is not None:
+            fluctuations_list = [upper_bound_on_fluct * el for el in fluctuations_list]
 
     loglogavgslope_list = []
     line_slope_list = []
     line_offset_list = []
     # assume the leftover elements are in the order of `loglogavgslope`, `line slope`, `line offset`
-    lists = [loglogavgslope_list, line_slope_list, line_offset_list]
-    for i, element in enumerate(raw):
-        lists[i % 3].append(element)
-
+    if not old:
+        lists = [fluctuations_list, loglogavgslope_list, line_slope_list, line_offset_list]
+        for i, element in enumerate(raw):
+            lists[i % 4].append(element)
+    else:
+        lists = [loglogavgslope_list, line_slope_list, line_offset_list]
+        for i, element in enumerate(raw):
+            lists[i % 3].append(element)
 
     # Now turn everything into floats
+    fluctuations_list = [float(el) for el in fluctuations_list]
     loglogavgslope_list = [float(el) for el in loglogavgslope_list]
     line_slope_list = [float(el) for el in line_slope_list]
     line_offset_list = [float(el) for el in line_offset_list]
@@ -1711,13 +1722,20 @@ def posterior_parameters(posterior_samples, signal_model, upper_bound_on_fluct =
     return posterior_parameters_dict
 
 
-def visualize_posterior_histograms(posterior_parameters_dict):
+def visualize_posterior_histograms(posterior_parameters_dict, initial_fluct):
     from scipy.stats import norm, lognorm
-    # Set up a 2x2 grid of subplots
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
 
-    # Flatten axes array for easy iteration
-    axes = axes.flatten()
+    show_all = False
+
+    # Set up a 2x2 grid of subplots
+    if show_all:
+        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        # Flatten axes array for easy iteration
+        axes = axes.flatten()
+    else:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        axes = [ax]
+
 
     # List of parameter names
     parameter_names = list(posterior_parameters_dict.keys())
@@ -1725,32 +1743,38 @@ def visualize_posterior_histograms(posterior_parameters_dict):
     for i, param in enumerate(parameter_names):
         # Get the values for the current parameter
         values = posterior_parameters_dict[param]
+        print("num of vals: ", len(values))
 
         # Plot histogram for each parameter
-        axes[i].hist(values, bins=20, color='skyblue', edgecolor='black', density=True, label=f"Posterior samples")
+        if show_all:
+            axes[i].hist(values, bins=20, color='skyblue', edgecolor='black', density=True, label=f"Posterior samples")
+        elif param == "fluctuations":
+            axes[0].hist(values, bins=20, color='skyblue', edgecolor='black', density=True, label=f"Posterior samples")
 
         # Overlay the appropriate analytic prior distribution
-        if param == "loglogavgslope":
+        if param == "loglogavgslope" and show_all:
             # Prior: Vertical line at -4 for `loglogavgslope`
             axes[i].axvline(x=-4, color='red', linestyle='--', label="Prior")
 
         elif param == "fluctuations":
             # Uniform distribution prior
+            fluct_posterior_mean = np.mean(values)
             x = np.linspace(0, 1, 1000)
             pdf = np.ones_like(x) / (max(values) - min(values))
             axes[i].plot(x, pdf, color='black', label="Prior:")
-            axes[i].vlines(0.6, 0, 5, linestyle='--', color='red', label="Initial position")
+            axes[i].vlines(initial_fluct, 0, 5, linestyle='--', color='red', label="Initial position")
+            axes[i].vlines(fluct_posterior_mean, 0, 5, linestyle='--', color='blue', label="Arithmetic mean")
             axes[i].set_xlim(-0.1, 1.1)
             axes[i].set_ylim(0, 6)
 
-        elif param == "line slope":
+        elif param == "line slope" and show_all:
             # Prior: Normal with mu=2 and sigma=5 for `slope of line`
             mu, sigma = 2, 5
             x = np.linspace(min(values)-5, max(values)+5, 1000)
             pdf = norm.pdf(x, mu, sigma)*np.max(values)
             axes[i].plot(x, pdf, color='black', label="Prior")
 
-        elif param == "line offset":
+        elif param == "line offset" and show_all:
             # Prior: Normal with mu=30 and sigma=10 for `offset of line`
             mu, sigma = 30, 10
             x = np.linspace(min(values)-10, max(values)+10, 1000)
@@ -1758,13 +1782,20 @@ def visualize_posterior_histograms(posterior_parameters_dict):
             axes[i].plot(x, pdf, color='black', label="Prior")
 
         # Add labels and title
-        axes[i].set_xlabel(f"Value of {param}")
-        axes[i].set_ylabel("Frequency")
-        axes[i].legend(loc="upper left")
+        if show_all:
+            axes[i].set_xlabel(f"Value of {param}")
+            axes[i].set_ylabel("Frequency")
+            axes[i].legend(loc="upper left")
+    else:
+        axes[0].set_xlabel(f"Value of fluctuations")
+        axes[0].set_ylabel("Frequency")
+        axes[0].legend(loc="upper left")
 
     # Adjust layout to prevent overlap
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f"data_storage/bbip_experiment/fluctuation_histograms/hist_initial_fluct_{initial_fluct}.png")
+    # plt.show()
+    plt.clf()
 
 
 def construct_initial_position(n_pix_ext, distances, fluctuations):
@@ -1865,15 +1896,15 @@ def construct_initial_position(n_pix_ext, distances, fluctuations):
 # plt.tight_layout()
 # plt.savefig("PAPER_comparison_fields.png")
 # plt.show()
-ms = [-0.5, ]  # means
-ss = [1, ]  # sigmas
-colors = ["black", "green"]
-for m, s, c in zip(ms, ss, colors):
-    plot_lognormal_histogram(mean=m, sigma=s, n_samples=7000, vlines=[0.147, 0.14], save=False, show=False,
-                             color=c, mode="Uniform")
+# ms = [-0.5, ]  # means
+# ss = [1, ]  # sigmas
+# colors = ["black", "green"]
+# for m, s, c in zip(ms, ss, colors):
+#     plot_lognormal_histogram(mean=m, sigma=s, n_samples=7000, vlines=[0.147, 0.14], save=False, show=False,
+#                              color=c, mode="Uniform")
 
-plt.ylim(0, 100)
-plt.xlim(0, 1)
-plt.tight_layout()
+# plt.ylim(0, 100)
+# plt.xlim(0, 1)
+# plt.tight_layout()
 # plt.savefig("PAPER_fluctuation_distribution.png")
-plt.show()
+# plt.show()

@@ -4,48 +4,63 @@ from .CONFIG_synthetic import *
 from scipy.optimize import curve_fit
 
 full_signal_space = False
-plot_in_signal_space = True
+plot_in_signal_space = False
 plot_in_data_space = False
 
-pickled_data = unpickle_me_this("real/further_analysis/synth7.pickle", absolute_path=False)
-# pickled_data = unpickle_me_this("synthetic/2025-04-30_11-40-56.pickle", absolute_path=False)
-
-samples, data, ground_truth_field, signal_model, neg_a_mag = pickled_data
-s=signal_model
-
-x_length = np.max(neg_a_mag) # ADJUST
-x_fac = 2 # ADJUST
-pxl_size = x_length / n_pix
-
-x = ift.RGSpace(n_pix, distances=pxl_size)  # The Signal space.
-x_ext = ift.RGSpace(x_fac*n_pix, distances=pxl_size)  # The extended signal space
-x = attach_custom_field_method(x)  # Attach `field()` method
-x_ext = attach_custom_field_method(x_ext)  # Attach `field()` method
-
-X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
+fluct_range = np.arange(0.1, 1, 0.1)
+corresponding_pickles = ["2025-05-21_15-22-53.pickle",
+"2025-05-21_15-39-45.pickle",
+"2025-05-21_15-56-39.pickle",
+"2025-05-21_16-13-46.pickle",
+"2025-05-21_16-30-44.pickle",
+"2025-05-21_16-47-55.pickle",
+"2025-05-21_17-05-06.pickle",
+"2025-05-21_17-22-17.pickle",
+"2025-05-21_17-38-44.pickle"]
 
 
-# plot_flat_lcdm_fields(x_max=np.max(np.log(1 + z_p)), show=True, save=False)  # Creates a plot of the comparison CMB and SN fields
-# plot_charm1_in_comparison_fields(x_max_pn=np.max(np.log(1 + z_p)), x_max_union=np.max(np.log(1+z_u)), show=False,
-#                                save=True)
+for idx, fluct in enumerate(fluct_range):
+    pickl = corresponding_pickles[idx]
+    pickled_data = unpickle_me_this(f"/Users/iason/PycharmProjects/Charm2/data_storage/bbip_experiment/all_pickles/synthetic/{pickl}", absolute_path=True)
+    # pickled_data = unpickle_me_this("synthetic/2025-04-30_11-40-56.pickle", absolute_path=False)
 
-# For plotting purposes:
-z_p, mu_p, _ = read_data_pantheon()
-z_u, mu_u, _ = read_data_union()
-z_d, mu_d, _ = read_data_des()
+    samples, data, ground_truth_field, signal_model, neg_a_mag = pickled_data
+    s=signal_model
 
-# Extract and visualize posterior samples
-posterior_realizations_list = samples
+    x_length = np.max(neg_a_mag) # ADJUST
+    x_fac = 2 # ADJUST
+    pxl_size = x_length / n_pix
 
-s_mean, s_var = posterior_realizations_list.sample_stat(s)
+    x = ift.RGSpace(n_pix, distances=pxl_size)  # The Signal space.
+    x_ext = ift.RGSpace(x_fac*n_pix, distances=pxl_size)  # The extended signal space
+    x = attach_custom_field_method(x)  # Attach `field()` method
+    x_ext = attach_custom_field_method(x_ext)  # Attach `field()` method
 
-posterior_samples = list(posterior_realizations_list.iterator(s))  # Nifty8 Field instances
-posterior_samples_cleaned = [X.adjoint(field).val for field in posterior_samples]  # Extracted values
+    X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
 
-# Uncommented because CDF needs to be applied instead of exp and CDF uniform prior needs to be plotted
-# instead of lognormal prior on fluct
-post_parameters_dict = posterior_parameters(posterior_realizations_list, signal_model=s, upper_bound_on_fluct=1)
-visualize_posterior_histograms(post_parameters_dict)
+
+    # plot_flat_lcdm_fields(x_max=np.max(np.log(1 + z_p)), show=True, save=False)  # Creates a plot of the comparison CMB and SN fields
+    # plot_charm1_in_comparison_fields(x_max_pn=np.max(np.log(1 + z_p)), x_max_union=np.max(np.log(1+z_u)), show=False,
+    #                                save=True)
+
+    # For plotting purposes:
+    z_p, mu_p, _ = read_data_pantheon()
+    z_u, mu_u, _ = read_data_union()
+    z_d, mu_d, _ = read_data_des()
+
+    # Extract and visualize posterior samples
+    posterior_realizations_list = samples
+
+    s_mean, s_var = posterior_realizations_list.sample_stat(s)
+
+    posterior_samples = list(posterior_realizations_list.iterator(s))  # Nifty8 Field instances
+    posterior_samples_cleaned = [X.adjoint(field).val for field in posterior_samples]  # Extracted values
+
+    # Uncommented because CDF needs to be applied instead of exp and CDF uniform prior needs to be plotted
+    # instead of lognormal prior on fluct
+    post_parameters_dict = posterior_parameters(posterior_realizations_list, signal_model=s, upper_bound_on_fluct=1)
+    visualize_posterior_histograms(post_parameters_dict, fluct)
+
 
 def linear(x, m, t):
     return m * x + t
@@ -116,7 +131,8 @@ if plot_in_data_space:
     plt.legend()
     plt.show()
 else:
-    # x_ext = x_ext old
-    x_ext = X @ x  # I think?
-    s_mean = s_mean
-    s_var = s_var
+    pass
+    # # x_ext = x_ext old
+    # x_ext = X @ x  # I think?
+    # s_mean = s_mean
+    #s_var = s_var
