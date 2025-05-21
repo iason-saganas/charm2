@@ -1,0 +1,14 @@
+I describe the procedure for testing the reconstruction bias based on the initial position.
+
+In our model, the data is not informative enough to robustly constraint the value of the fluctuations parameter, leading to slightly different posterior means that, by in large, agree with each other inside their 1 sigma reconstruction error bands. 
+
+We test whether there is a drift towards either low or high fluctuation values by investigating the summary statistics of the posterior distributions of this parameter. In particular, we look at whether the mean posterior fluctuation value is to the right or to the left of the respective initial position. This heuristic constitutes a drift towards high or low fluctuations values respectively. 
+
+In this numerical experiment. We set 100 global KL iterations. We sample the space 30 times per step, although in the very last iteration, we go for 100 samples, in order to have a high number of posterior samples (200 due to mirror sampling).
+
+The initial positions shall be fluct = [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9]
+
+We save all results in the folder /data_storage/bbip_experiment, standing for `bias based on initial position`.
+
+Taking 500 synthetic datapoints and an exponentially falling data density with redshift
+
