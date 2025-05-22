@@ -1,0 +1,11 @@
+Charm2 inference run on the 2025-05-21 16:47:55. Mode: synthetic
+Length of dataset: 500
+Time took in minutes: 17.18
+Model parameters: cfm_{'offset_mean': 0, 'offset_std': None, 'loglogavgslope': (-4, 1e-16), 'fluctuations': (0.2, 0.14), 'asperity': None, 'flexibility': None}_lm_{'slope': (2, 5), 'intercept': (30, 10)}
+
+Number of global KL minimization runs: 100
+
+File counting_report.txt not found.
+
+File minisanity.txt not found.
+
