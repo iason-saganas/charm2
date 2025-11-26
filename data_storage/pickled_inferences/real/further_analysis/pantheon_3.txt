@@ -6,7 +6,7 @@ Fluctuations from a uniform in interval (0,1).
 Initial position applied! At fluct = 0.2, line model offset, slope & xi_s
 ~ mean of posterior Union2.1 samples.
 
-Model parameters: cfm_{'offset_mean': 0, 'offset_std': None, 'fluctuations': (0.2, 0.14), 'loglogavgslope': (-4, 1e-16), 'asperity': None, 'flexibility': None}_lm_{'slope': (2, 5), 'intercept': (30, 10)}
+Model parameters: cfm_{'offset_mean': 0, 'offset_std': None, 'fluctuations': U(0,1), 'loglogavgslope': (-4, 1e-16), 'asperity': None, 'flexibility': None}_lm_{'slope': (2, 5), 'intercept': (30, 10)}
 Calculated value of H0: 72.1 ± 0.4984
 Number of global KL minimization runs: 32
 

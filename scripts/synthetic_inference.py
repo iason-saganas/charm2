@@ -18,10 +18,10 @@ def main_synthetic(plot_ground_truth, plot_mock_data):
 
     # if wished, add a systematic increase / decrease of SN mags at high redshift
 
-    bump_idx = np.where(neg_a_mag < 0.44)
+    bump_idx = np.where(neg_a_mag < 0.1)  # was: 0.44
     bump_vals = np.zeros_like(d.val)
-    bump_vals[bump_idx] = 0
-    # bump_vals[bump_idx] = +0.2  # systematically increase / decrease low/high redshift moduli
+    # bump_vals[bump_idx] = 0
+    bump_vals[bump_idx] = +0.1   # systematically increase / decrease low/high redshift moduli
     d = d + ift.Field.from_raw(d.domain, arr=bump_vals)
 
     # Plot signal field ground truth, as well as data realizations
@@ -33,13 +33,14 @@ def main_synthetic(plot_ground_truth, plot_mock_data):
                             mu_array=np.concatenate((mu_p, mu_u)), save=False, show=plot_mock_data)
 
     likelihood_energy = ift.GaussianEnergy(d, N.inverse) @ R
-    global_iterations = 32
+    global_iterations = 50
+    new_sampling_rate = lambda iter: 15 if iter < 99 else 100
 
     inference_start = time()
 
     posterior_samples, final_pos = ift.optimize_kl(likelihood_energy=likelihood_energy,
                                         total_iterations=global_iterations,
-                                        n_samples=kl_sampling_rate,
+                                        n_samples=new_sampling_rate,
                                         kl_minimizer=descent_finder,
                                         sampling_iteration_controller=ic_sampling_lin,
                                         nonlinear_sampling_minimizer=geoVI_sampling_minimizer,

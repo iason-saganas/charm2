@@ -13,8 +13,11 @@ from .utilitites import construct_initial_position
 # Define the Covariance of the Gaussian Likelihood as a 'ScalingOperator'
 # Define iteration and minimization control
 
-n_dp = 500
-neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=True)  # The negative scale factor magnitude,
+n_dp = 1829  # 500
+des_hist_edges = np.loadtxt("/Users/iason/PycharmProjects/Charm2/data_storage/raw_data/desy5_data_histogram_bin_edges.txt")
+des_hist_counts = np.loadtxt("/Users/iason/PycharmProjects/Charm2/data_storage/raw_data/desy5_data_histogram_bin_counts.txt")
+
+neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=True, end_of_data=0.7514160887, specific_hist=(des_hist_edges, des_hist_counts))  # The negative scale factor magnitude,
 # x = -log(a) = log(1+z)
 
 config = {
@@ -52,14 +55,15 @@ args_lm = {
 X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
 
 # The to-be-inferred signal on the extended domain
-cfm = ift.SimpleCorrelatedField(target=x_ext, **args_cfm)
+cfm = ift.SimpleCorrelatedField(target=x_ext, use_uniform_prior_on_fluctuations=True, **args_cfm)
 line = LineModel(target=x_ext, args=args_lm)
 s = cfm + line
 
 # ift.plot_priorsamples(s)
 # The ground truth model
 # s_g = PiecewiseLinear(signal_space=x_ext, omega_m_custom=0.3, omega_l_custom=2, high_curv=True)  # for high curvature choose this and set the matter exponent to 5 instead of 3
-s_g = PiecewiseLinear(signal_space=x_ext, omega_m_custom=0.3, omega_l_custom=0.7, high_curv=False)  # Standard flat LCDM model
+s_g = PiecewiseLinear(signal_space=x_ext, omega_m_custom=0.334, omega_l_custom=0.666, high_curv=False,
+                      offset_custom=29.75+0.06)  # Standard flat LCDM model with s_sn set as ground truth
 
 arguments = 'cfm_' + str(args_cfm) + '_lm_' + str(args_lm)
 

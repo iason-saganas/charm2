@@ -17,6 +17,15 @@ import nifty8 as ift
 def cosmological_likelihood(data_to_use):
     z, mu, covariance = read_data(data_to_use)
 
+    # print("Typical variance level: ", np.mean(np.diag(covariance)))
+    # import matplotlib.pyplot as plt
+    #
+    # plt.errorbar(z, mu, yerr=np.diag(covariance), fmt='o', lw=0, elinewidth=1, capsize=3, markersize=2, color="black")
+    # plt.xlabel("$z$")
+    # plt.ylabel("$\mu(z)$")
+    # plt.ylim(32, 46)
+    # plt.show()
+
     config = {
         'Signal Field Resolution': 4096,  # 2**12
         'Length of signal space': np.max(np.log(1 + z)),
@@ -58,7 +67,7 @@ def cosmological_likelihood(data_to_use):
     X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
 
     # The to-be-inferred signal on the extended domain
-    s = ift.SimpleCorrelatedField(target=x_ext, **args_cfm) + LineModel(target=x_ext, args=args_lm)
+    s = ift.SimpleCorrelatedField(target=x_ext, **args_cfm, use_uniform_prior_on_fluctuations=True) + LineModel(target=x_ext, args=args_lm)
     arguments = 'cfm_' + str(args_cfm) + '_lm_' + str(args_lm)
 
     # Build the signal response, noise operator, data field and others
@@ -68,10 +77,10 @@ def cosmological_likelihood(data_to_use):
 
     d = ift.Field(domain=ift.DomainTuple.make(data_space,), val=mu)
 
-    initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.2)
-    # initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.6)  # TESTING PURPOSES
+    # initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.2)
+    initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.05)
 
-    # FOR ANALYSIS OF POSSIBLE SYSTEMATIC EFFECTS. COMMENT WHEN NO LONGER NEEDED:
+    # FOR ANALYSIS OF POSSIBLE SYSTEMATIC EFFECTS. COMMENT OUT WHEN NO LONGER NEEDED:
 
     # bump_idx = np.where(neg_a_mag > 0.44)
     # bump_vals = np.zeros_like(d.val)

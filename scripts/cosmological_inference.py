@@ -14,13 +14,22 @@ def main_cosmological(data_to_use="Union2.1"):
 
     print(f"\nUsing {data_to_use} data.\n")
 
-    global_iterations = 32
+    # global_iterations = 32
+    global_iterations = 50
+
+    def new_kl_rate(iter):
+        if iter < 25:
+            return 7
+        elif iter < 48:
+            return 20
+        else:
+            return 100
 
     inference_start = time()
 
     posterior_samples = ift.optimize_kl(likelihood_energy=likelihood,
                                         total_iterations=global_iterations,
-                                        n_samples=kl_sampling_rate,
+                                        n_samples=new_kl_rate,
                                         kl_minimizer=descent_finder,
                                         sampling_iteration_controller=ic_sampling_lin,
                                         nonlinear_sampling_minimizer=geoVI_sampling_minimizer,
@@ -50,6 +59,6 @@ def main_cosmological(data_to_use="Union2.1"):
 
     # Signal Space Comparison Visualization
     plot_charm2_in_comparison_fields(x_max_pn=np.max(np.log(1 + z_p)), x_max_union=np.max(np.log(1+z_u)),
-                                     x_max_des=np.max(np.log(1+z_d)), show=True, save=True, x=x.field().val,
+                                     x_max_des=np.max(np.log(1+z_d)), show=True, save=False, x=x.field().val,
                                      s=X.adjoint(s_mean).val, s_err=s_err, dataset_used=data_to_use,
-                                     neg_a_mag=neg_a_mag)
+                                     neg_a_mag=neg_a_mag, )
