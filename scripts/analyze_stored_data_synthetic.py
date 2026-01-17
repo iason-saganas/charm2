@@ -95,7 +95,7 @@ if plot_in_signal_space:
 
         mean_prior_field = s(construct_initial_position(n_pix_ext=s_mean.domain[0].shape[0],
                                                       distances=s_mean.domain[0].distances[0],
-                                                      fluctuations=0.2,
+                                                      fluctuations=0.6,
                                                       apply_prior_line_slope=True,
                                                       apply_prior_line_offset=True,
                                                       apply_prior_xi_s=True
@@ -106,8 +106,8 @@ if plot_in_signal_space:
 
 
         plot_synthetic_ground_truth(x=x, ground_truth=X.adjoint(ground_truth_field).val, x_max_pn=np.max(np.log(1 + z_p)),
-                                    reconstruction=(reconstruct_mean, np.sqrt(reconstruct_var)), save=False,
-                                    show=True, custom_ax=ax3, # further_samples=[X.adjoint(mean_prior_field)],
+                                    reconstruction=(reconstruct_mean, np.sqrt(reconstruct_var)), save=True,
+                                    show=True, custom_ax=ax3, further_samples=[X.adjoint(mean_prior_field)],
                                     labels_further_samples=["Prior mean field"])
 
         stop

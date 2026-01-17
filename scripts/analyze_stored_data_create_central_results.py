@@ -1,8 +1,10 @@
 from data_storage.style_components.matplotlib_style import *
-# Run from root directory as: `python3.12 -m scripts.analyze_stored_data_create_central_results`
+# Run from root directory as: `python3.12 -m scripts.analyze_stored_data_create_central_results_2`
 from scipy.constants import G, c
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+
+from .utilitites import special_legend_III
 
 cosmological = True
 extend = False
@@ -68,12 +70,11 @@ def get_mean_and_sqrt(pickled_samples, s_model, X_operator):
     return s_mean, s_err
 
 
+
 z_p, mu_p, _ = read_data_pantheon()
 z_u, mu_u, _ = read_data_union()
 z_d, mu_d, _ = read_data_des()
-
-
-def run_plot(ax, data_to_analyze, samples, b0):
+def run_plot(ax, data_to_analyze, samples, b0, total_figure_height=8, **kwargs):
     # get likelihood & s_model
     likelihood, d, neg_a_mag, arguments, x, X, s, init_pos, cov = cosmological_likelihood(data_to_use=data_to_analyze)
     data_space = d.domain
@@ -92,18 +93,22 @@ def run_plot(ax, data_to_analyze, samples, b0):
         dataset_used=data_to_analyze,
         neg_a_mag=neg_a_mag,
         b0=b0,
-        apply_common_labels=False,
         disable_hist=True,
-        disable_x_label=True,
-        disable_y_label=True,
-        plot_evolving_dark_energy=False,
-        custom_axs=ax
+        custom_axs=ax,
+        total_figure_height=total_figure_height,
+        **kwargs
     )
 
 
-def plot_hist(axis, neg_a_mag, x_max):
+def plot_hist(axis, neg_a_mag, x_max, set_ylabel=True, total_figure_height=8):
+    if axis is None:
+        reconstruction_height = total_figure_height * 2/3
+        hist_height = reconstruction_height/2
+        # hist_height + reconstruction_height - total_figure_height == 0 True
+        fig, axis = plt.subplots(figsize=(10, hist_height))
     hist_data = axis.hist(neg_a_mag, histtype="step", color="black", lw=0.5, bins=10)
-    axis.set_ylabel(r"$\#$ of dtps", fontsize=30)
+    if set_ylabel:
+        axis.set_ylabel(r"$\#$ of dtps", fontsize=30)
     axis.set_xlim(0, x_max)
 
 
@@ -119,108 +124,161 @@ samples_desy5_b0_0_05 = unpickle_me_this("/Users/iason/PycharmProjects/Charm2/da
 
 plots = [
     ("Union2.1", samples_union_b0_0_6, 0.6),
-    ("Union2.1", samples_union_b0_0_2, 0.2),
-    ("Pantheon+", samples_pantheon_b0_0_6, 0.6),
-    ("Pantheon+", samples_pantheon_b0_0_2, 0.2),
     ("DESY5", samples_desy5_b0_0_6, 0.6),
+    ("Pantheon+", samples_pantheon_b0_0_6, 0.6),
+    ("Union2.1", samples_union_b0_0_2, 0.2),
     ("DESY5", samples_desy5_b0_0_2, 0.2),
+    ("Pantheon+", samples_pantheon_b0_0_2, 0.2),
+    ("Charm1", None, None),
     ("DESY5", samples_desy5_b0_0_05, 0.05),
 ]
-
-# s_mean_2, s_var_2 = second_sample.sample_stat(s)
-# s_mean_2 =  X.adjoint(s_mean_2)
-
-# latent_posterior = posterior_realizations_list.sample_stat()[0].val
-# posterior_line_slope = 2 + 5 * latent_posterior["line model slope"]
-# posterior_line_offset = 30 + 10 * latent_posterior["line model y-intercept"]
-#
-# posterior_line = linear(x.field().val, posterior_line_slope, posterior_line_offset)
-# posterior_cfm = s_mean.val - posterior_line
-
-# from scipy.optimize import curve_fit
-
-# popt = curve_fit(linear, x.field().val, s_mean.val, sigma=s_err)
-#
-# bf_line_to_signal = linear(x.field().val, *popt[0])
-# plt.title("residuals between resulting field and soley a linear model")
-# plt.plot(x.field().val, bf_line_to_signal- s_mean.val)  # max abs(res) = 0.15
-# plt.show()
-# stop
-# popt = curve_fit(flat_lcdm, x.field().val, s_mean.val, sigma=s_err)
-# popt2 = curve_fit(flat_evolving_dark_energy, x.field().val, s_mean.val, sigma=s_err)[0]
-
-n_cols = 3
-n_data_rows = 1 + (len(plots)-1)//n_cols + 1  # adjust rows as needed
-height_ratios = [0.5] + [1]*(n_data_rows-1)
-
-fig = plt.figure(figsize=(10*n_cols, 5*n_data_rows), dpi=70)
-gs = gridspec.GridSpec(n_data_rows, n_cols, figure=fig, wspace=0.1, hspace=0.1, height_ratios=height_ratios)
-
-# Let them share the same axis
-axs = []
-for i in range(n_cols):
-    for j in range(n_cols):
-        if i == 0 and j == 0:
-            ax = fig.add_subplot(gs[i,j])  # first subplot
-        else:
-            ax = fig.add_subplot(gs[i,j], sharex=axs[0])  # share x with first
-        axs.append(ax)
-
-# only show x labels on the bottom:
-
-for ax in axs[:-n_cols]:  # all except bottom row
-    ax.label_outer()  # hides x labels and tick labels where not needed
-
-axs[0].set_xlim(0, 1.2)
-axs[0].set_ylim(29.5, 33)
 
 _, _, neg_a_mag_union, _, _, _, _, _, _ = cosmological_likelihood(data_to_use="Union2.1")
 _, _, neg_a_mag_pantheon, _, _, _, _, _, _ = cosmological_likelihood(data_to_use="Pantheon+")
 _, _, neg_a_mag_desy5, _, _, _, _, _, _ = cosmological_likelihood(data_to_use="DESY5")
 
-# Example data for your histograms
-neg_a_mags_list = [neg_a_mag_union, neg_a_mag_pantheon, neg_a_mag_desy5]  # define these
-x_max = 1.2
 
-# Fill first row with histograms
-for j in range(n_cols):
-    ax = axs[j]  # first row
-    if j < len(neg_a_mags_list):
-        plot_hist(ax, neg_a_mags_list[j], x_max)
+neg_a_mags_list = [neg_a_mag_union, neg_a_mag_desy5, neg_a_mag_pantheon]
+x_max=1.2
+
+"""
+Example plots: Singular histograms and reconstruction plots
+"""
+# for neg_a_mag in neg_a_mags_list:
+#     ax=None
+#     plot_hist(ax, neg_a_mag, x_max)
+#     plt.tight_layout()
+#     plt.show()
+#
+# for i, (dataset, samples, b0) in enumerate(plots):
+#     ax = None
+#     run_plot(ax, dataset, samples, b0)
+#     plt.tight_layout()
+#     plt.show()
+
+"""
+Scaffolding for tiling said single plots
+"""
+n_cols = 3
+n_rows = 4
+total_figure_height = 8   # internal height
+fontsize_of_legend = 25
+fontsize_of_labels = 30
+height_ratios = [0.5, 1, 1, 1]   # hist row half height
+
+fig = plt.figure(figsize=(10*n_cols, total_figure_height*n_rows), dpi=70)  # construct one big image to be rescaled
+# later
+gs = gridspec.GridSpec(n_rows, n_cols, figure=fig,
+                      height_ratios=height_ratios,
+                      wspace=0.2, hspace=0.2)  # corresponding gridspec
+
+axs = []  # collect all axes..
+for i in range(n_rows):
+    for j in range(n_cols):
+        axs.append(fig.add_subplot(gs[i, j]))
+
+hist_axes = axs[:3]
+reconstruction_axes = axs[3:]
+
+"""
+Fill in the histograms
+"""
+for hist_ax, neg_a_mag in zip(hist_axes, neg_a_mags_list):
+    # Only y label on the first column
+    plot_hist(hist_ax, neg_a_mag, x_max, set_ylabel=False, total_figure_height=total_figure_height)
+
+
+"""
+Fill in the reconstruction plots
+"""
+
+special_kwargs = {
+    0: {"apply_common_labels": True, "plot_evolving_dark_energy": False},
+    1: {"apply_common_labels": False, "plot_evolving_dark_energy": True, "plot_de_label": True},
+    2: {"apply_common_labels": False, "plot_evolving_dark_energy": False},
+    3: {"apply_common_labels": False, "plot_evolving_dark_energy": False},
+    4: {"apply_common_labels": False, "plot_evolving_dark_energy": True},
+    5: {"apply_common_labels": False, "plot_evolving_dark_energy": False},
+    6: {"apply_common_labels": False, "plot_evolving_dark_energy": False},
+    7: {"apply_common_labels": False, "plot_evolving_dark_energy": True},
+}
+for i, (reconstruction_ax, plot_object) in enumerate(zip(reconstruction_axes, plots)):
+    dataset, samples, b0 = plot_object
+    reconstruction_ax.set_ylim(29.5, 33)
+    if dataset == "Charm1":
+        if i != 6:
+            raise ValueError("Ordering error.")
+        plot_charm1_in_comparison_fields(show=False, save=False, disable_hist=True, apply_common_labels=False,
+                                         custom_ax=reconstruction_ax)
+        reconstruction_ax.legend(fontsize=fontsize_of_legend, loc="upper left")
     else:
-        ax.set_visible(False)  # hide any extra axes if n>len(neg_a_mags_list)
+        kwargs_to_pass = special_kwargs[i]
+        run_plot(reconstruction_ax, dataset, samples, b0, total_figure_height=total_figure_height, **kwargs_to_pass)
+
+        # print("\n\n")
+        # print("reconstruction ax labels: ", reconstruction_ax.get_legend_handles_labels())
+        # print("\n\n")
+        special_legend_III(plot_evolving_dark_energy=kwargs_to_pass["plot_evolving_dark_energy"],
+                           custom_axs=reconstruction_ax, fontsize=fontsize_of_legend)
 
 
-# Now plot, skipping the first row
-for i, (dataset, samples, b0) in enumerate(plots):
-    row, col = divmod(i, n_cols)
-    row += 1  # skip first row
-    ax = fig.add_subplot(gs[row, col])
-    run_plot(ax, dataset, samples, b0)
+"""
+Remove all x labels and y labels and afterwards add them where they need to be 
+"""
 
-# plt.tight_layout()
-plt.savefig("mytest.pdf", format="pdf", bbox_inches='tight')
-plt.show()
+labels_to_add = [
+    {"id": (1,1), "x_label": None, "y_label": r"$\#$ of dtps"},
+    {"id": (2,1), "x_label": None, "y_label": "$s(x)$"},
+    {"id": (3,1), "x_label": None, "y_label": "$s(x)$"},
+    {"id": (4,1), "x_label": r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$", "y_label": "$s(x)$"},
+    {"id": (4,2), "x_label": r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$", "y_label": None},
+    {"id": (3,3), "x_label": r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$", "y_label": None},
+]
 
-stop
+for label_info in labels_to_add:
+    row, col = label_info["id"]
+    ax = axs[(row-1) * n_cols + (col-1)]   # convert 1-based to 0-based
 
-plot_charm2_in_comparison_fields(x_max_pn=np.max(np.log(1 + z_p)), x_max_union=np.max(np.log(1 + z_u)),
-                                 x_max_des=np.max(np.log(1 + z_d)), show=True, save=False, x=x.field().val,
-                                 s=s_mean.val, s_err=s_err, dataset_used=data_to_analyze,
-                                 neg_a_mag=neg_a_mag, b0=fluct, apply_common_labels=True, disable_hist=True,
-                                 disable_x_label=False, disable_y_label=False, plot_evolving_dark_energy=False,
-                                 # additional_sample_labels="Pantheon 0.2=b0",
-                                 # additional_samples=[s_mean_2.val,]
-                                 # additional_samples=[
-                                 #     flat_lcdm( x.field().val, popt[0][0], popt[0][1] ),
-                                 #     flat_evolving_dark_energy(x.field().val, *popt2)]
-                                 # ,additional_sample_labels=["flat LCDM fit", "flat evolving dark energy fit"],
-                                 # additional_samples=[
-                                 #     posterior_line,
-                                 #     posterior_cfm
-                                 # ]
-                                 # ,
-                                 # additional_sample_labels=["Posterior line", "Posterior cfm"],
-                                 )
+    if label_info["x_label"] is not None:
+        ax.set_xlabel(label_info["x_label"], fontsize=fontsize_of_labels)
 
+    if label_info["y_label"] is not None:
+        ax.set_ylabel(label_info["y_label"], fontsize=fontsize_of_labels)
+
+# Destroy all unneccessary tick labels (skip histograms)
+for ax in axs[3:]:
+    xlabel = ax.get_xlabel()
+    ylabel = ax.get_ylabel()
+    if xlabel == "":
+        ax.set_xticklabels([])
+    if ylabel == "":
+        ax.set_yticklabels([])
+
+# But also disable x tick labels on the histogram
+for ax in axs[:3]:
+    ax.set_xticklabels([])
+
+
+"""
+Extras
+"""
+
+for ax in axs[-1:]:
+        ax.set_visible(False)  # hide the extra axes on the very
+
+for ax in axs:
+    ax.set_xlim(0, max(neg_a_mag_pantheon))
+    # ax.legend()  # calling legend_III() above, so uncommenting will overwrite changes
+
+fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
+
+"""
+Show plot
+"""
+
+global_fac = 2.1
+width_fac = 1.25
+fig.set_size_inches(12*global_fac*width_fac, 8*global_fac)   # shrink the whole thing
+plt.savefig("PAPER_final_reconstructions.pdf", format="pdf", bbox_inches='tight')
+# plt.show()
 

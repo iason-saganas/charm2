@@ -1032,7 +1032,7 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
                                      x_max_des: float, dataset_used: str, b0:float, neg_a_mag, show: bool = False,
                                      save: bool = True, additional_samples = None, additional_sample_labels = None,
                                      apply_common_labels = True, disable_hist=False, disable_x_label=False, disable_y_label=False,
-                                     plot_evolving_dark_energy=False, custom_axs=None):
+                                     plot_evolving_dark_energy=False, plot_de_label=False,custom_axs=None, total_figure_height=8):
     """
     Plots the reconstructed charm1 curve using Union2.1 data into a figure containing CMB and SN comparison fields.
     :param dataset_used:    Either `Union2.1`, `Pantheon+` or `DESY5`
@@ -1057,7 +1057,7 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
     if not disable_hist:
 
         # Create a figure
-        fig = plt.figure(figsize=(10, 8))
+        fig = plt.figure(figsize=(10, total_figure_height))
 
         # Create a GridSpec with 3 rows and 1 column
         gs = gridspec.GridSpec(2, 1, height_ratios=[1, 2])
@@ -1084,7 +1084,8 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
     elif custom_axs:
         ax2 = custom_axs
     else:
-        fig, ax2 = plt.subplots(figsize=(10, 16/3))
+        reconstruction_height = 2/3*total_figure_height
+        fig, ax2 = plt.subplots(figsize=(10, reconstruction_height))
 
 
     # Reconstruction in signal space
@@ -1124,17 +1125,21 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
             print("dims: ", x_reduced, s_red)
             ax2.plot(x_reduced, s_red, alpha=1, markersize=0, lw=2, label=additional_sample_labels[idx])
 
-
     if plot_evolving_dark_energy:
         s_evolving = build_flat_evolving_dark_energy(x_reduced)
-        lb = None
-        # lb = "Evolving dark energy"
-        plt.plot(x_reduced, s_evolving, color="black", ls="-", alpha=1, lw=2, markersize=0, label=lb)
+        if plot_de_label:
+            lb = "Evolving dark energy"
+        else:
+            lb = None
+        ax2.plot(x_reduced, s_evolving, color="black", ls="-", alpha=1, lw=2, markersize=0, label=lb)
 
-    special_legend_III(plot_evolving_dark_energy)
+    # special_legend_III(plot_evolving_dark_energy)
 
     # For DES: ylim=(29.5, 32.5)
-    plt.tight_layout()
+    if custom_axs is not None:
+        print("Disabling plt.tight_layout() since plotting on custom axis, possibly multiplot figure.")
+    else:
+        plt.tight_layout()
     if disable_x_label:
         plt.gca().xaxis.set_visible(False)
     if disable_y_label:
@@ -1143,7 +1148,8 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
               save_filename=filename, show=show, loc="upper left", disable_legend=True)
 
 
-def plot_charm1_in_comparison_fields(show: bool = False, save: bool = True, disable_hist=False, apply_common_labels=False):
+def plot_charm1_in_comparison_fields(show: bool = False, save: bool = True, disable_hist=False, apply_common_labels=False,
+                                     custom_ax=None):
     """
     Plots the reconstructed charm1 curve using Union2.1 or Pantheon+ data into a figure containing CMB and SN
     comparison fields.
@@ -1184,6 +1190,8 @@ def plot_charm1_in_comparison_fields(show: bool = False, save: bool = True, disa
         ax1.set_ylabel(r"$\#$ of dtps", fontsize=30)
         ax1.set_xlim(0, x_max_pn)
 
+    elif custom_ax:
+        ax2 = custom_ax
     else:
         fig, ax2 = plt.subplots(figsize=(10, 16/3*1.41))
 
@@ -1238,7 +1246,8 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
     yl = r"$s(x)$"
     if save:
         # filename = "data_storage/figures/fluctuations_is_not_constrained/PAPER_EDE_as_bump_in_data"
-        filename = "data_storage/figures/PAPER_EDE_as_bump_in_data"
+        # filename = "data_storage/figures/PAPER_EDE_as_bump_in_data"
+        filename = "data_storage/figures/pdf_versions_rest/PAPER_synthetic_exponential_data_b0_0_6_V2"
     else:
         filename = ""
     custom_ax.plot(x, ground_truth, "-", color="black", lw=1, label="Synthetic ground truth")
@@ -1274,12 +1283,12 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
     # plot_comparison_fields()
 
     # Ensure the legend uses the same dash pattern
-    special_legend_IV()
-    # special_legend_I()
+    # special_legend_IV()
+    special_legend_I()
 
     # Revert to: (0, 1.25) and ylim (29.5, 36) for figure limits in paper
     # Revert to: (0, 1.25) and ylim (29.5, 33) for figure limits in paper of DESY5 histogram mock reconstruction (last figure)
-    show_plot(x_lim=(0, 1.25), y_lim=(29.5, 33), x_label=xl, y_label=yl, title="",
+    show_plot(x_lim=(0, 1.25), y_lim=(29.5, 36), x_label=xl, y_label=yl, title="",
               save_filename=filename, show=show, loc="upper left", disable_legend=True)
 
 
@@ -1521,9 +1530,14 @@ def special_legend_II():
 
 
 
-def special_legend_III(plot_evolving_dark_energy=False):
+def special_legend_III(plot_evolving_dark_energy=False, custom_axs=None, fontsize=25):
     # Get existing legend handles and labels
-    handles, labels = plt.gca().get_legend_handles_labels()
+    if custom_axs is None:
+        ax = plt.gca()
+    else:
+        ax = custom_axs
+
+    handles, labels = ax.get_legend_handles_labels()
 
     # Define the specific replacements
     replacements = {
@@ -1535,18 +1549,28 @@ def special_legend_III(plot_evolving_dark_energy=False):
     # Modify the handles based on the replacements
     handles = [replacements[label] if label in replacements else h for h, label in zip(handles, labels)]
 
-    # Reorder: 1st→3rd, 3rd→4th, 4th→1st
-    order = [1,0] if plot_evolving_dark_energy else [3, 1, 0, 2]
-    # try:
-    #     handles = [handles[i] for i in order]
-    #     labels = [labels[i] for i in order]
-    # except IndexError:
-    #     order = [1, 0]
-    #     handles = [handles[i] for i in order]
-    #     labels = [labels[i] for i in order]
+    # Reorder: 1st→3rd, 3rd→4th, 4th→1st: [3, 1, 0, 2]
+    # order = [1,0] if plot_evolving_dark_energy else [2, 3, 1, 0]
+    # # try:
+    # #     handles = [handles[i] for i in order]
+    # #     labels = [labels[i] for i in order]
+    # # except IndexError:
+    # #     order = [1, 0]
+    # #     handles = [handles[i] for i in order]
+    # #     labels = [labels[i] for i in order]
+
+    # Define desired order depending on plot_evolving_dark_energy
+    desired_order = [1, 0] if plot_evolving_dark_energy else [3, 1, 0, 2]
+
+    # Only keep indices that are valid for the current handles/labels
+    order = [i for i in desired_order if i < len(handles)]
+
+    # Reorder handles and labels safely
+    handles = [handles[i] for i in order]
+    labels = [labels[i] for i in order]
 
     # Recreate the legend with the modified handles
-    plt.legend(handles, labels, fontsize=25, loc="upper left")
+    ax.legend(handles, labels, fontsize=fontsize, loc="upper left")
 
 
 def special_legend_IV():
