@@ -3,9 +3,9 @@ import numpy as np
 
 LH = cosmological_likelihood(data_to_use="Union2.1", init_fluctuations_parameter=0.2)
 
-global_iterations = 2
-# kl_rate = lambda itr: 10 if iter < 10 else 20
-kl_rate = lambda itr: 1  # dlt later
+global_iterations = 1
+# kl_rate = lambda itr: 10 if itr < 10 else 20
+kl_rate = lambda itr: 2
 
 
 inference_args = dict(likelihood_energy=LH.like,

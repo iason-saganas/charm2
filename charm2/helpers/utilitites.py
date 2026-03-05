@@ -2150,7 +2150,7 @@ def visualize_posterior_histograms(posterior_parameters_dict, initial_fluct):
 
 
 def construct_initial_position(n_pix_ext, distances, fluctuations, apply_prior_line_slope=False,
-                               apply_prior_line_offset=False, apply_prior_xi_s=False):
+                               apply_prior_line_offset=False, apply_prior_xi_s=True):
     """
     Constructs a MultiField that can be fed into `initial_position` of optimize_kl. The MultiField's structure is like
     this:
@@ -2219,22 +2219,27 @@ def construct_initial_position(n_pix_ext, distances, fluctuations, apply_prior_l
     print("\nConstructing initial position... The fluctuation parameter is around ", norm.cdf(xi_fluct))
 
     fluct = ift.makeField(scalar_domain, arr=np.array(xi_fluct))
-    pow_slope = ift.makeField(scalar_domain, arr=np.array(3.96641546e-07))
+
+    xi_llslope = np.random.standard_normal()  # old version: 3.96641546e-07
+    pow_slope = ift.makeField(scalar_domain, arr=np.array(xi_llslope))
 
     if apply_prior_line_slope:
         line_slope = ift.makeField(scalar_domain, arr=np.array(1e-10))
     else:
-        line_slope = ift.makeField(scalar_domain, arr=np.array(-0.12847809050927028))
+        xi_line_slope = np.random.standard_normal()  # old version: -0.12847809050927028
+        line_slope = ift.makeField(scalar_domain, arr=np.array(xi_line_slope))
 
     if apply_prior_line_offset:
         line_offset = ift.makeField(scalar_domain, arr=np.array(1e-10))
     else:
-        line_offset = ift.makeField(scalar_domain, arr=np.array(-0.012743781703426963))
+        xi_line_offset = np.random.standard_normal()  # old version: -0.012743781703426963
+        line_offset = ift.makeField(scalar_domain, arr=np.array(xi_line_offset))
 
     if apply_prior_xi_s:
-        # xi_s_vals = np.ones(harmonic_RGspace.shape[0])  # mean of iid, Update 2026: This is false. Draw iid.
-        xi_s_vals = np.random.standard_normal(harmonic_RGspace.shape[0])  # mean of iid
+        # xi_s_vals = np.ones(harmonic_RGspace.shape[0])  # mean of iid | Update 2026: This is false. Draw iid.
+        xi_s_vals = np.random.standard_normal(harmonic_RGspace.shape[0])
         xi_s = ift.makeField(harmonic_RGspace, xi_s_vals)
+        raise_warning("Setting init pos in xi_s to posterior mean of a Union2.1 reconstruction")
     else:
         xi_s = ift.makeField(harmonic_RGspace, xi_values)
 

@@ -39,6 +39,8 @@ from nifty8.operators.diagonal_operator import DiagonalOperator
 
 from nifty8.field import Field
 from nifty8.operators.matrix_product_operator import MatrixProductOperator
+from sympy.benchmarks.bench_meijerint import alpha
+from scipy.signal.windows import tukey
 
 from .custom_normal_operators import StandardUniformTransform
 
@@ -56,7 +58,8 @@ def CustomSimpleCorrelatedField(
     use_uniform_prior_on_fluctuations,
     prefix="",
     harmonic_partner=None,
-    op_to_apply_to_amp=None
+    op_to_apply_to_amp=None,
+    tukey_taper_ends=False,
 ):
     """Simplified version of :class:`~nifty8.library.correlated_fields.CorrelatedFieldMaker`.
 
@@ -184,7 +187,17 @@ def CustomSimpleCorrelatedField(
     else:
         pass
 
+    N = target.shape[0]
+    if not tukey_taper_ends:
+        win = np.ones(N)
+    else:
+        win = tukey(N, alpha=0.1)
+
+
     op = ht(pd(a).real*xi)
+    window_op = DiagonalOperator(diagonal=Field.from_raw(op.target, arr=win))
+
+    op = window_op(op)
 
     if offset_mean is not None:
         op = Adder(full(op.target, float(offset_mean))) @ op

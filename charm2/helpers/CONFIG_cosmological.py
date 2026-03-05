@@ -74,14 +74,17 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
 
     # Arguments of the line model
     args_lm = {
-        'slope': (2, 5),
-        'intercept': (30, 10)
+        #'slope': (2, 5),
+        'slope': (10, 10),
+        #'intercept': (30, 10)
+        'intercept': (30, 30)
     }
 
     X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
 
     # The to-be-inferred signal on the extended domain
-    s_cfm = CustomSimpleCorrelatedField(target=x_ext, **args_cfm, use_uniform_prior_on_fluctuations=True)
+    s_cfm = CustomSimpleCorrelatedField(target=x_ext, **args_cfm, use_uniform_prior_on_fluctuations=True,
+                                        tukey_taper_ends=True)
     s_line = LineModel(target=x_ext, args=args_lm)
 
     s = s_cfm + s_line
