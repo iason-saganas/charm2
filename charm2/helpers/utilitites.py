@@ -47,7 +47,7 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'read_data_des', 'store_meta_data', 'get_datetime', 'read_data', 'plot_histogram',
            'plot_prior_cfm_samples', 'posterior_parameters', 'visualize_posterior_histograms',
            'construct_initial_position', 'evolving_dark_energy_fit', 'optimize_kl_and_store_metadata', '_LhContainer',
-           '_LhMetaContainer', 'FlatLCDM']
+           '_LhMetaContainer', 'FlatLCDM', 'FlatEDE']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -108,6 +108,67 @@ def FlatLCDM(target: RGSpace):
     # s_base = np.log(inner_log_func)
     s = inner_log_func.ptw("log")
     return s
+
+
+def FlatEDE(target: RGSpace):
+    """
+    Assuming uniform priors in
+
+        w0 ~ [-2,2]
+        wa ~ [-15,15]
+        Ωm ~ [0,1]
+        H0 ~ [0,100]
+
+    such that the posterior values found in https://arxiv.org/pdf/2401.02929 are well inside those intervals.
+    :param target: The target signal space.
+    :return:
+    """
+    m = 3 / (8 * np.pi * G)
+    x = target
+    x_coord = DiagonalOperator(diagonal=x.field())
+    N  = len(x.field().val)
+    contraction = ContractionOperator(domain=x, spaces=None)
+
+    Ωm = StandardUniformTransform(upper_bound=1, key="EDE_Omega_m")
+    H0 = StandardUniformTransform(upper_bound=100, key="EDE_Omega_H0")
+    w0 = StandardUniformTransform(shift=-2, upper_bound=2*2, key="EDE_w0")
+    wa = StandardUniformTransform(shift=-15, upper_bound=2*15, key="EDE_wa")
+
+    Ωm =  contraction.adjoint @ Ωm
+    H0 = contraction.adjoint @ H0
+    w0 = contraction.adjoint @ w0
+    wa = contraction.adjoint @ wa
+
+    three = Field.from_raw(domain=x, arr=3*np.ones(N))
+    one = Field.from_raw(domain=x, arr=np.ones(N))
+    shift_one = Adder(Field.from_raw(domain=x, arr=np.ones(N)))
+    ΩΛ = shift_one(-1*Ωm)
+
+    exp_1 = (x_coord(three)).ptw("exp")
+    exp_1_diag = DiagonalOperator(diagonal=exp_1)
+    term_1 = exp_1_diag @ Ωm
+
+    exp_2 = (x_coord @ (3*(shift_one(w0+wa)))).ptw("exp")
+
+    helper_1 = shift_one(-1*(-1*x_coord(one)).ptw("exp"))
+    helper_1_diag = DiagonalOperator(diagonal=helper_1)
+    helper_2 = helper_1_diag(wa)
+    exp_3 = (-3*helper_2).ptw("exp")
+
+    E_sq = term_1 + ΩΛ * exp_2 * exp_3
+
+    inner_log_func = m * H0.ptw("power",2) * E_sq
+    s = inner_log_func.ptw("log")
+
+
+    # omega_l0 = 1 - omega_m0
+    # E_sq = omega_m0 * np.exp(3 * x) + omega_l0 * np.exp(3 * x * (1 + w_0 + w_a)) * np.exp(
+    #     -3 * (w_a * (1 - np.exp(-x))))
+    # inner_log_func = m * H_0 ** 2 * E_sq
+    # s = np.log(inner_log_func)
+
+    return s
+
 
 
 def attach_custom_field_method(space: RGSpace):
@@ -2392,38 +2453,28 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
     current_expansion_mean, current_expansion_err = current_expansion_rate(LH.meta.ZP.adjoint(s_mean).val, s_err)
     H0_estimate = f"Calculated value of H0: {current_expansion_mean} ± {current_expansion_err}"
 
-    note =""
+    note = ""
     if mode == "flat_LCDM":
         # Assuming: Omega_m uniform in [0,1]
         # Assuming: H0 uniform in [0,100]
-
-        H0 = StandardUniformTransform(upper_bound=100, key="flat_lcdm_H0")
-        Ωm = StandardUniformTransform(upper_bound=1, key="flat_lcdm_Omega_m")
-
-        import scipy.stats
-        sl_gen = list(posterior_samples.iterator())
-
-        H0_relevant_samples = [mf.extract(H0.domain) for mf in sl_gen]
-        Omega_m_relevant_samples = [mf.extract(Ωm.domain) for mf in sl_gen]
-
-        H0_relevant_samples = [sl.val['flat_lcdm_H0'] for sl in H0_relevant_samples]
-        Omega_m_relevant_samples = [sl.val['flat_lcdm_Omega_m'] for sl in Omega_m_relevant_samples]
-
-        posterior_H0_samples = np.array([norm.cdf(xi) for xi in H0_relevant_samples])
-        posterior_omega_m_samples = np.array([100*norm.cdf(xi) for xi in Omega_m_relevant_samples])
-
-        posterior_H0_value = np.mean(posterior_H0_samples)
-        posterior_H0_value_std = np.std(posterior_H0_samples)
-
-        posterior_omega_m = np.mean(posterior_omega_m_samples)
-        posterior_omega_m_std = np.std(posterior_omega_m_samples)
+        (posterior_omega_m, posterior_omega_m_std), (posterior_H0_value, posterior_H0_value_std) =  _get_posterior_flat_LCDM_samples(posterior_samples)
 
         note = (f"Posterior model values: Ωm = {np.round(posterior_omega_m,2)}±{np.round(posterior_omega_m_std,2)} and "
                 f"H0 = {np.round(posterior_H0_value,3)}±{np.round(posterior_H0_value_std,3)}")
+    elif mode == "flat_EDE":
+        (Ωm_stats, H0_stats, w0_stats, wa_stats) = _get_posterior_flat_EDE_samples(posterior_samples)
 
-    new_store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(LH.meta.d.val), expansion_rate=H0_estimate,
-                        inference_type='real', signal_model_param=LH.meta.s_mdl_meta, other=note,
-                        global_kl_iterations=kwargs['total_iterations'], folder_name=f"cache", data_storage_dir_name=out_name)
+        posterior_omega_m, posterior_omega_m_std = Ωm_stats
+        posterior_H0_value, posterior_H0_value_std = H0_stats
+        posterior_w0, posterior_w0_std = w0_stats
+        posterior_wa, posterior_wa_std = wa_stats
+
+        note = (
+            f"Posterior model values: Ωm = {np.round(posterior_omega_m, 2)}±{np.round(posterior_omega_m_std, 2)}, "
+            f"H0 = {np.round(posterior_H0_value, 3)}±{np.round(posterior_H0_value_std, 3)}, "
+            f"w0 = {np.round(posterior_w0, 2)}±{np.round(posterior_w0_std, 2)}, "
+            f"wa = {np.round(posterior_wa, 2)}±{np.round(posterior_wa_std, 2)}"
+        )
 
     if calculate_elbo:
         nonlinear_ic = LH.meta.ic_and_minimizers[1]
@@ -2432,10 +2483,75 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
                 hamiltonian=ham,
                 samples=posterior_samples,
                 n_eigenvalues=min(ham.domain.size, len(LH.meta.d.val)),
-                batch_number=10,
+                n_batches=10,
             )
+        elbo_stats = {k: fld.val for k, fld in elbo_stats.items()}
+
+        note +=f"\nElbo stats: {elbo_stats}"
+
+    new_store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(LH.meta.d.val), expansion_rate=H0_estimate,
+                        inference_type='real', signal_model_param=LH.meta.s_mdl_meta, other=note,
+                        global_kl_iterations=kwargs['total_iterations'], folder_name=f"cache", data_storage_dir_name=out_name)
+
 
     return posterior_samples
+
+
+def _get_posterior_flat_LCDM_samples(posterior_samples):
+    H0 = StandardUniformTransform(upper_bound=100, key="flat_lcdm_H0")
+    Ωm = StandardUniformTransform(upper_bound=1, key="flat_lcdm_Omega_m")
+
+    import scipy.stats
+    sl_gen = list(posterior_samples.iterator())
+
+    H0_relevant_samples = [mf.extract(H0.domain) for mf in sl_gen]
+    Omega_m_relevant_samples = [mf.extract(Ωm.domain) for mf in sl_gen]
+
+    H0_relevant_samples = [sl.val['flat_lcdm_H0'] for sl in H0_relevant_samples]
+    Omega_m_relevant_samples = [sl.val['flat_lcdm_Omega_m'] for sl in Omega_m_relevant_samples]
+
+    posterior_H0_samples = np.array([100 * norm.cdf(xi) for xi in H0_relevant_samples])
+    posterior_omega_m_samples = np.array([norm.cdf(xi) for xi in Omega_m_relevant_samples])
+
+    posterior_H0_value = np.mean(posterior_H0_samples)
+    posterior_H0_value_std = np.std(posterior_H0_samples)
+
+    posterior_omega_m = np.mean(posterior_omega_m_samples)
+    posterior_omega_m_std = np.std(posterior_omega_m_samples)
+
+    Ωm_stats = (posterior_omega_m, posterior_omega_m_std)
+    H0_stats = (posterior_H0_value, posterior_H0_value_std)
+
+    return Ωm_stats, H0_stats
+
+def _get_posterior_flat_EDE_samples(posterior_samples):
+    Ωm = StandardUniformTransform(upper_bound=1, key="EDE_Omega_m")
+    H0 = StandardUniformTransform(upper_bound=100, key="EDE_Omega_H0")
+    w0 = StandardUniformTransform(shift=-2, upper_bound=2 * 2, key="EDE_w0")
+    wa = StandardUniformTransform(shift=-15, upper_bound=2 * 15, key="EDE_wa")
+
+    import numpy as np
+    from scipy.stats import norm
+
+    sl_gen = list(posterior_samples.iterator())
+
+    Ωm_xi = [mf.extract(Ωm.domain).val["EDE_Omega_m"] for mf in sl_gen]
+    H0_xi = [mf.extract(H0.domain).val["EDE_Omega_H0"] for mf in sl_gen]
+    w0_xi = [mf.extract(w0.domain).val["EDE_w0"] for mf in sl_gen]
+    wa_xi = [mf.extract(wa.domain).val["EDE_wa"] for mf in sl_gen]
+
+    Ωm_samples = norm.cdf(np.array(Ωm_xi))
+    H0_samples = 100 * norm.cdf(np.array(H0_xi))
+    w0_samples = -2 + 4 * norm.cdf(np.array(w0_xi))
+    wa_samples = -15 + 30 * norm.cdf(np.array(wa_xi))
+
+    Ωm_stats = (np.mean(Ωm_samples), np.std(Ωm_samples))
+    H0_stats = (np.mean(H0_samples), np.std(H0_samples))
+    w0_stats = (np.mean(w0_samples), np.std(w0_samples))
+    wa_stats = (np.mean(wa_samples), np.std(wa_samples))
+
+    return Ωm_stats, H0_stats, w0_stats, wa_stats
+
 
 
 # In NormalOperators:

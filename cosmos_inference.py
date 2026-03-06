@@ -3,8 +3,9 @@ import numpy as np
 
 LH = cosmological_likelihood(data_to_use="Union2.1", mode='non-parametric', init_fluctuations_parameter=0.2)
 
-global_iterations = 30
+global_iterations = 15
 kl_rate = lambda itr: 30
+
 
 inference_args = dict(likelihood_energy=LH.like,
                         total_iterations=global_iterations,

@@ -22,7 +22,7 @@ from .custom_correlated_field import CustomSimpleCorrelatedField
 
 
 def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"],
-                            mode:Literal["non-parametric", "flat_LCDM"], init_fluctuations_parameter=None):
+                            mode:Literal["non-parametric", "flat_LCDM", "flat_EDE"], init_fluctuations_parameter=None):
     """
 
     :param data_to_use:                     String indicating which dataset to load.
@@ -114,7 +114,18 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
         initial_pos = ift.MultiField.from_dict(dct=init_pos_dict)
 
         arguments = 'H0_[0,100]_uniform_and_Omega_m_[0,1]_uniform'
+    elif mode == "flat_EDE":
+        s = FlatEDE(target=x_ext)
 
+        scalar_domain = ift.DomainTuple.make(())
+        init_pos_dict = {"EDE_Omega_m": ift.makeField(scalar_domain, arr=np.random.standard_normal()),
+                         "EDE_Omega_H0": ift.makeField(scalar_domain, arr=np.random.standard_normal()),
+                         "EDE_w0": ift.makeField(scalar_domain, arr=np.random.standard_normal()),
+                         "EDE_wa": ift.makeField(scalar_domain, arr=np.random.standard_normal()),
+                         }
+
+        initial_pos = ift.MultiField.from_dict(dct=init_pos_dict)
+        arguments = 'w0_[-2,2]_uniform_and_wa_[-15,15]_uniform_and_Omega_m_[0,1]_uniform_and_H0_[0,100]_uniform'
     else:
         raise ValueError(f"Unknown mode {mode}")
 
