@@ -21,7 +21,8 @@ __all__ = ["cosmological_likelihood", "ic_sampling_lin", "ic_sampling_nl", "geoV
 from .custom_correlated_field import CustomSimpleCorrelatedField
 
 
-def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"], init_fluctuations_parameter):
+def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"],
+                            mode:Literal["non-parametric", "flat_LCDM"], init_fluctuations_parameter=None):
     """
 
     :param data_to_use:                     String indicating which dataset to load.
@@ -82,17 +83,41 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
 
     X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
 
-    # The to-be-inferred signal on the extended domain
-    s_cfm = CustomSimpleCorrelatedField(target=x_ext, **args_cfm, use_uniform_prior_on_fluctuations=True,
-                                        tukey_taper_ends=True)
-    s_line = LineModel(target=x_ext, args=args_lm)
+    if mode == "non-parametric":
 
-    s = s_cfm + s_line
+        # Construct initial position
+        if init_fluctuations_parameter is None:
+            raise ValueError("Please provide init_fluctuations_parameter if in non-parametric mode")
 
-    s.line_model = s_line
-    s.cf_model = s_cfm
+        # initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.2)
+        initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size,
+                                                 fluctuations=init_fluctuations_parameter,
+                                                 apply_prior_xi_s=True)  # `apply_prior_xi_s=True` <-> draws random init pos
 
-    arguments = 'cfm_' + str(args_cfm) + '_lm_' + str(args_lm)
+        # Construct model
+        s_cfm = CustomSimpleCorrelatedField(target=x_ext, **args_cfm, use_uniform_prior_on_fluctuations=True,
+                                            tukey_taper_ends=True)
+        s_line = LineModel(target=x_ext, args=args_lm)
+        s = s_cfm + s_line
+        s.line_model = s_line
+        s.cf_model = s_cfm
+
+        arguments = 'cfm_' + str(args_cfm) + '_lm_' + str(args_lm)
+
+    elif mode == "flat_LCDM":
+        s = FlatLCDM(target=x_ext)
+
+        scalar_domain = ift.DomainTuple.make(())
+        init_pos_dict = {"flat_lcdm_H0": ift.makeField(scalar_domain, arr=np.random.standard_normal()),
+                         "flat_lcdm_Omega_m": ift.makeField(scalar_domain, arr=np.random.standard_normal()),}
+
+        initial_pos = ift.MultiField.from_dict(dct=init_pos_dict)
+
+        arguments = 'H0_[0,100]_uniform_and_Omega_m_[0,1]_uniform'
+
+    else:
+        raise ValueError(f"Unknown mode {mode}")
+
 
     # Build the signal response, noise operator, data field and others
     R = build_response(signal_space=x, signal=X.adjoint @ s, data_space=data_space, neg_scale_factor_mag=neg_a_mag)
@@ -100,9 +125,6 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
     N = CovarianceMatrix(domain=data_space, matrix=covariance, sampling_dtype=np.float64, tol=1e-4)
 
     d = ift.Field(domain=ift.DomainTuple.make(data_space,), val=mu)
-
-    # initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=0.2)
-    initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size, fluctuations=init_fluctuations_parameter)
 
     # FOR ANALYSIS OF POSSIBLE SYSTEMATIC EFFECTS. COMMENT OUT WHEN NO LONGER NEEDED:
 
@@ -115,9 +137,29 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
 
     likelihood_energy = ift.GaussianEnergy(d, N.inverse) @ R
 
+    # Specify iteration control
+
+    # Iteration control for `MGVI` and linear parts of the inference
+    ic_sampling_lin = ift.AbsDeltaEnergyController(name="Precise linear sampling", deltaE=0.02, iteration_limit=100)
+
+    # Iteration control for `geoVI`
+    ic_sampling_nl = ift.AbsDeltaEnergyController(name="Coarser, nonlinear sampling", deltaE=0.5, iteration_limit=20,
+                                                  convergence_level=2)
+    # For the non-linear sampling part of geoVI, the iteration controller has to be "promoted" to a minimizer:
+    geoVI_sampling_minimizer = ift.NewtonCG(ic_sampling_nl)
+
+    # KL Minimizer control, the same energy criterion as the geoVI iteration control, but more iteration steps
+    ic_newton = ift.AbsDeltaEnergyController(name='Newton Descent Finder', deltaE=0.1, convergence_level=2,
+                                             iteration_limit=35)
+    descent_finder = ift.NewtonCG(ic_newton)
+
+    ic_and_minimizers = (ic_sampling_lin, ic_sampling_nl, geoVI_sampling_minimizer, ic_newton, descent_finder)
+
+
     LH_meta = _LhMetaContainer(d=d, neg_a_mag=neg_a_mag,s_model=s, s_mdl_meta=arguments,
                                x=x, ZP=X, init_pos=initial_pos, b0=init_fluctuations_parameter,
-                               noise_cov=covariance, dataset_name=data_to_use)
+                               noise_cov=covariance, dataset_name=data_to_use, mode=mode,
+                               ic_and_minimizers=ic_and_minimizers)
     LH = _LhContainer(like=likelihood_energy, meta=LH_meta)
 
     # In old versions, you might explicitly need these args:
@@ -126,6 +168,10 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
     return LH
 
 
+raise_warning("\nUnion2.1 covariance matrix is only symmetric up to a factor of 10^{-10}.\n"
+              "Pantheon+ covariance matrix is only symmetric up to a factor of 10^{-4}.\n\n")
+
+# Also put iteration controlers into global namespace for simplicity right now
 # Iteration control for `MGVI` and linear parts of the inference
 ic_sampling_lin = ift.AbsDeltaEnergyController(name="Precise linear sampling", deltaE=0.02, iteration_limit=100)
 
@@ -140,6 +186,4 @@ ic_newton = ift.AbsDeltaEnergyController(name='Newton Descent Finder', deltaE=0.
                                          iteration_limit=35)
 descent_finder = ift.NewtonCG(ic_newton)
 
-raise_warning("\nUnion2.1 covariance matrix is only symmetric up to a factor of 10^{-10}.\n"
-              "Pantheon+ covariance matrix is only symmetric up to a factor of 10^{-4}.\n\n")
-
+ic_and_minimizers = (ic_sampling_lin, ic_sampling_nl, geoVI_sampling_minimizer, ic_newton, descent_finder)

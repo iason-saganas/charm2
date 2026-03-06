@@ -1,5 +1,5 @@
 from matplotlib import pyplot as plt
-from nifty8 import LikelihoodEnergyOperator, MultiDomain, MultiField
+from nifty8 import LikelihoodEnergyOperator, MultiDomain, MultiField, StandardHamiltonian, estimate_evidence_lower_bound
 from nifty8.domain_tuple import DomainTuple
 from nifty8.field import Field
 import numpy as np
@@ -47,7 +47,7 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'read_data_des', 'store_meta_data', 'get_datetime', 'read_data', 'plot_histogram',
            'plot_prior_cfm_samples', 'posterior_parameters', 'visualize_posterior_histograms',
            'construct_initial_position', 'evolving_dark_energy_fit', 'optimize_kl_and_store_metadata', '_LhContainer',
-           '_LhMetaContainer']
+           '_LhMetaContainer', 'FlatLCDM']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -74,6 +74,40 @@ def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
     line_model = x_coord @ alpha + beta
     line_model.myAttr = "Line test"
     return line_model
+
+
+def FlatLCDM(target: RGSpace):
+    """
+    Constructs a signal field based on the parametric, flat ΛCDM model with H0 and Ωm explored uniformly in ranges
+    [0,100] km/s and [0,1], respectively.
+
+    :param target:  The target signal space.
+    :return:        An operator which applied to latent samples corresponding to Ωm and H0 gives the signal field.
+    """
+    x = target
+    contraction = ContractionOperator(domain=x, spaces=None)
+
+    m = 3 / (8 * np.pi * G)
+    H0 = StandardUniformTransform(upper_bound=100, key="flat_lcdm_H0")
+    Ωm = StandardUniformTransform(upper_bound=1, key="flat_lcdm_Omega_m")
+
+    H0 = contraction.adjoint @ H0
+    Ωm = contraction.adjoint @ Ωm
+
+    x_coord = DiagonalOperator(diagonal=x.field())
+    N = len(x.field().val)
+    three = Field.from_raw(domain=x, arr=3*np.ones(N))
+
+    bracket_term = ((x_coord(three)).ptw("exp") - 1)
+    diagonal_bracket_term = DiagonalOperator(diagonal=bracket_term)
+    shift_one = Adder(Field.from_raw(domain=x, arr=np.ones(N)))
+
+    inner_log_func = m * H0.ptw("power",2) * shift_one(diagonal_bracket_term(Ωm))
+
+    # inner_log_func = m * H0 ** 2 * (1 + Omega_m * (np.exp(3 * x) - 1))
+    # s_base = np.log(inner_log_func)
+    s = inner_log_func.ptw("log")
+    return s
 
 
 def attach_custom_field_method(space: RGSpace):
@@ -787,7 +821,7 @@ def store_meta_data(name, duration_of_inference, len_d, inference_type, signal_m
 
 def new_store_meta_data(name, duration_of_inference, len_d, inference_type, signal_model_param,
                     global_kl_iterations, expansion_rate="", folder_name="temp", data_storage_dir_name="data_storage",
-                    ):
+                    other=''):
     """
     See documentation for `store_meta_data`.
     """
@@ -804,6 +838,7 @@ def new_store_meta_data(name, duration_of_inference, len_d, inference_type, sign
     # Ensure final directory exists
     os.makedirs(final_dir, exist_ok=True)
 
+
     # Create the metadata file
     with open(filename, 'w') as file:
         file.write(f"Charm2 inference run on the {transform_datetime_string(name)}. Mode: {inference_type}\n")
@@ -811,7 +846,8 @@ def new_store_meta_data(name, duration_of_inference, len_d, inference_type, sign
         file.write(f"Time took in minutes: {duration_minutes:.2f}\n")
         file.write(f"Model parameters: {signal_model_param}\n")
         file.write(f"{expansion_rate}\n")
-        file.write(f"Number of global KL minimization runs: {global_kl_iterations}\n\n")
+        file.write(f"Number of global KL minimization runs: {global_kl_iterations}\n")
+        file.write(f"{other}\n\n")
 
         # Append contents of the other files
         for additional_file in ['counting_report.txt', 'minisanity.txt']:
@@ -1162,7 +1198,8 @@ def plot_charm2_in_comparison_fields(x: np.array, s: np.array, s_err: np.array, 
     h0_charm2 = str(current_expansion_mean)
     now = get_datetime()
     if save:
-        filename = f"data_storage/figures/fluctuations_is_not_constrained/charm2_reconstruction_{dataset_used}_{now}"
+        # filename = f"data_storage/figures/fluctuations_is_not_constrained/charm2_reconstruction_{dataset_used}_{now}"
+        filename = f"{dataset_used}_{now}"
     else:
         filename = ""
 
@@ -2239,9 +2276,9 @@ def construct_initial_position(n_pix_ext, distances, fluctuations, apply_prior_l
         # xi_s_vals = np.ones(harmonic_RGspace.shape[0])  # mean of iid | Update 2026: This is false. Draw iid.
         xi_s_vals = np.random.standard_normal(harmonic_RGspace.shape[0])
         xi_s = ift.makeField(harmonic_RGspace, xi_s_vals)
-        raise_warning("Setting init pos in xi_s to posterior mean of a Union2.1 reconstruction")
     else:
         xi_s = ift.makeField(harmonic_RGspace, xi_values)
+        raise_warning("Setting init pos in xi_s to posterior mean of a Union2.1 reconstruction")
 
     init_pos_dict = {"fluctuations": fluct,
                      "line model slope": line_slope,
@@ -2267,6 +2304,8 @@ class _LhMetaContainer:
     b0: np.float64          # The initial b0 parameter from which `init_pos` was calculated
     noise_cov: CovarianceMatrix
     dataset_name: str
+    mode: str   # Either `non-parametric` or `parametric flat LCDM`
+    ic_and_minimizers: tuple  # tuple of: (ic_sampling_lin, ic_sampling_nl, geoVI_sampling_minimizer, ic_newton, descent_finder)
 
 
 @dataclass
@@ -2278,40 +2317,43 @@ class _LhContainer:
 def inspect_callback(out_name, LH_dataclass: _LhContainer, samples, global_iter):
     LH = LH_dataclass
     s_model = LH.meta.s_model
-    s_line = s_model.line_model
     cutter = LH.meta.ZP.adjoint
     x = LH.meta.x.field().val
-
-    line_model_domain = MultiDomain.make(
-        {'line model slope': DomainTuple.make(()), 'line model y-intercept': DomainTuple.make(())})
-    relevant_line_model_latent_samples = []
-    scalar_dom = DomainTuple.make(())
-    for sl in samples.iterator():
-        sample_values = sl.val
-        line_model_relevant_part = {k: v for k, v in sample_values.items()
-                                     if k in ["line model slope", "line model y-intercept"]}
-        dct = {
-            "line model slope": Field(scalar_dom, line_model_relevant_part["line model slope"]),
-            "line model y-intercept": Field(scalar_dom, line_model_relevant_part["line model y-intercept"]),
-        }
-        relevant_sample = MultiField.from_dict(domain=line_model_domain, dct=dct)
-        relevant_line_model_latent_samples.append(relevant_sample)
-
-    line_model_samples = [s_line(sl) for sl in relevant_line_model_latent_samples]
-    s_model_samples = [s_model(sl) for sl in samples.iterator()]
-
-    line_model_samples = [cutter(sl).val for sl in line_model_samples]
-    s_model_samples = [cutter(sl).val for sl in s_model_samples]
-
-    mean_line = np.mean(line_model_samples, axis=0)
-    mean_fw_model = np.mean(s_model_samples, axis=0)
+    mode = LH.meta.mode
 
     folder_name = out_name + "/fw_model/"
     os.makedirs(folder_name, exist_ok=True)
     fn = folder_name + "mean_fw_model_iter_" + str(global_iter)
 
+    s_model_samples = [s_model(sl) for sl in samples.iterator()]
+    s_model_samples = [cutter(sl).val for sl in s_model_samples]
+    mean_fw_model = np.mean(s_model_samples, axis=0)
+
+    if mode == 'non-parametric':
+        s_line = s_model.line_model
+        line_model_domain = MultiDomain.make(
+            {'line model slope': DomainTuple.make(()), 'line model y-intercept': DomainTuple.make(())})
+        relevant_line_model_latent_samples = []
+        scalar_dom = DomainTuple.make(())
+        for sl in samples.iterator():
+            sample_values = sl.val
+            line_model_relevant_part = {k: v for k, v in sample_values.items()
+                                         if k in ["line model slope", "line model y-intercept"]}
+            dct = {
+                "line model slope": Field(scalar_dom, line_model_relevant_part["line model slope"]),
+                "line model y-intercept": Field(scalar_dom, line_model_relevant_part["line model y-intercept"]),
+            }
+            relevant_sample = MultiField.from_dict(domain=line_model_domain, dct=dct)
+            relevant_line_model_latent_samples.append(relevant_sample)
+
+        line_model_samples = [s_line(sl) for sl in relevant_line_model_latent_samples]
+        line_model_samples = [cutter(sl).val for sl in line_model_samples]
+
+        mean_line = np.mean(line_model_samples, axis=0)
+
+        plt.plot(x, mean_line, label="mean line", linestyle='--', color="gray")
+
     plot_comparison_fields()
-    plt.plot(x, mean_line, label="mean line", linestyle='--', color="gray")
     plt.plot(x, mean_fw_model, label="mean fw", color=blue, lw=2)
     plt.xlabel(r"$x=-\mathrm{ln}(a)$")
     plt.ylabel("$s(x)$")
@@ -2322,7 +2364,7 @@ def inspect_callback(out_name, LH_dataclass: _LhContainer, samples, global_iter)
     plt.close()
 
 
-def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, **kwargs):
+def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=False, **kwargs):
     """
     :param LH_dataclass: An instance of the `_LhContainer` container class (see `CONFIG_cosmological`)
     :param kwargs:  Keyword arguments passed to ift.optimize_kl(). Omit output_directory! Will be built from dataset
@@ -2330,8 +2372,9 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, **kwargs):
     :return:
     """
     LH = LH_dataclass
-    out_name = f'inferences/real/{LH.meta.b0}/{LH.meta.dataset_name}/'
+    out_name = f'inferences/real/{LH.meta.b0}/{LH.meta.dataset_name}_{LH.meta.mode}/'
     callback = partial(inspect_callback, out_name, LH)
+    mode = LH.meta.mode
 
     from time import time
     inference_start = time()
@@ -2349,9 +2392,49 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, **kwargs):
     current_expansion_mean, current_expansion_err = current_expansion_rate(LH.meta.ZP.adjoint(s_mean).val, s_err)
     H0_estimate = f"Calculated value of H0: {current_expansion_mean} ± {current_expansion_err}"
 
+    note =""
+    if mode == "flat_LCDM":
+        # Assuming: Omega_m uniform in [0,1]
+        # Assuming: H0 uniform in [0,100]
+
+        H0 = StandardUniformTransform(upper_bound=100, key="flat_lcdm_H0")
+        Ωm = StandardUniformTransform(upper_bound=1, key="flat_lcdm_Omega_m")
+
+        import scipy.stats
+        sl_gen = list(posterior_samples.iterator())
+
+        H0_relevant_samples = [mf.extract(H0.domain) for mf in sl_gen]
+        Omega_m_relevant_samples = [mf.extract(Ωm.domain) for mf in sl_gen]
+
+        H0_relevant_samples = [sl.val['flat_lcdm_H0'] for sl in H0_relevant_samples]
+        Omega_m_relevant_samples = [sl.val['flat_lcdm_Omega_m'] for sl in Omega_m_relevant_samples]
+
+        posterior_H0_samples = np.array([norm.cdf(xi) for xi in H0_relevant_samples])
+        posterior_omega_m_samples = np.array([100*norm.cdf(xi) for xi in Omega_m_relevant_samples])
+
+        posterior_H0_value = np.mean(posterior_H0_samples)
+        posterior_H0_value_std = np.std(posterior_H0_samples)
+
+        posterior_omega_m = np.mean(posterior_omega_m_samples)
+        posterior_omega_m_std = np.std(posterior_omega_m_samples)
+
+        note = (f"Posterior model values: Ωm = {np.round(posterior_omega_m,2)}±{np.round(posterior_omega_m_std,2)} and "
+                f"H0 = {np.round(posterior_H0_value,3)}±{np.round(posterior_H0_value_std,3)}")
+
     new_store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(LH.meta.d.val), expansion_rate=H0_estimate,
-                    inference_type='real', signal_model_param=LH.meta.s_mdl_meta, global_kl_iterations=kwargs['total_iterations'],
-                    folder_name=f"cache", data_storage_dir_name=out_name)
+                        inference_type='real', signal_model_param=LH.meta.s_mdl_meta, other=note,
+                        global_kl_iterations=kwargs['total_iterations'], folder_name=f"cache", data_storage_dir_name=out_name)
+
+    if calculate_elbo:
+        nonlinear_ic = LH.meta.ic_and_minimizers[1]
+        ham = StandardHamiltonian(LH.like, nonlinear_ic)
+        elbo_samples, elbo_stats = estimate_evidence_lower_bound(
+                hamiltonian=ham,
+                samples=posterior_samples,
+                n_eigenvalues=min(ham.domain.size, len(LH.meta.d.val)),
+                batch_number=10,
+            )
+
     return posterior_samples
 
 

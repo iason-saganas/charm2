@@ -39,7 +39,6 @@ from nifty8.operators.diagonal_operator import DiagonalOperator
 
 from nifty8.field import Field
 from nifty8.operators.matrix_product_operator import MatrixProductOperator
-from sympy.benchmarks.bench_meijerint import alpha
 from scipy.signal.windows import tukey
 
 from .custom_normal_operators import StandardUniformTransform

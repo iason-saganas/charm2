@@ -1,12 +1,10 @@
 from charm2 import *
 import numpy as np
 
-LH = cosmological_likelihood(data_to_use="Union2.1", init_fluctuations_parameter=0.2)
+LH = cosmological_likelihood(data_to_use="Union2.1", mode='non-parametric', init_fluctuations_parameter=0.2)
 
-global_iterations = 1
-# kl_rate = lambda itr: 10 if itr < 10 else 20
-kl_rate = lambda itr: 2
-
+global_iterations = 30
+kl_rate = lambda itr: 30
 
 inference_args = dict(likelihood_energy=LH.like,
                         total_iterations=global_iterations,
@@ -21,6 +19,6 @@ inference_args = dict(likelihood_energy=LH.like,
                             )
 
 
-posterior_samples = optimize_kl_and_store_metadata(LH, **inference_args)
+posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=True, **inference_args)
 
 plot_charm2(posterior_samples, LH, plot_domain="signal")
