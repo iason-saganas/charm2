@@ -1,23 +1,25 @@
-from charm2.style_components.matplotlib_style import *
+from charm2 import *
+# import nifty8 as ift
+import nifty.cl as ift
 # Run from root directory as: `python3.12 -m scripts.analyze_stored_data`
 from scipy.constants import G
 
-cosmological = True
 extend = False
 data_to_analyze = "Union2.1"
 plot_in_signal_space = True
 plot_in_data_space = False
-if cosmological:
-    from .CONFIG_cosmological import *
-    likelihood, d, neg_a_mag, arguments, x, X, s, init_pos, cov = cosmological_likelihood(data_to_use=data_to_analyze)
-    data_space = d.domain
-else:
-    from .CONFIG_synthetic import *
-    raise ValueError("not implemented yet")
+init_fluctuations_parameter = 0.05
+
+LH = cosmological_likelihood(data_to_use=data_to_analyze, mode="non-parametric", init_fluctuations_parameter=init_fluctuations_parameter)
+
+properties_old_versions = (LH.like, LH.meta.d, LH.meta.neg_a_mag, LH.meta.s_mdl_meta, LH.meta.x, LH.meta.ZP, LH.meta.s_model, LH.meta.init_pos, LH.meta.noise_cov, LH.meta.dataset_name)
+likelihood_energy, d, neg_a_mag, arguments, x, X, s, init_pos, cov, _ = properties_old_versions
+
+data_space = d.domain
 
 # fluct_range = np.arange(0.1, 1, 0.1)
 # fluct_range = np.linspace(.05, 0.3, 5)  # for DESY5 low fluctuations experiment
-fluct_range = [0.05]
+fluct_range = [init_fluctuations_parameter]
 
 corresponding_pickles = [
     #"des.pickle"  # for fluct_init = 0.6
@@ -34,26 +36,6 @@ corresponding_pickles = [
 # "2025-05-25_21-00-17_init_fluct_is_0.3.pickle"
 # ]
 
-def flat_lcdm(x: np.array, H_0, omega_m):
-
-    # Construct the base lcdm, cmb parameters signal field
-    m = 3 / (8 * np.pi * G)
-    inner_log_func = m * H_0 ** 2 * (1 + omega_m * (np.exp(3 * x) - 1))
-    s_base = np.log(inner_log_func)
-
-    return s_base
-
-
-def flat_evolving_dark_energy(x: np.array, H_0=68.37, w_a=-8.8, w_0=-0.36, omega_m0=0.495):
-
-    omega_l0 = 1 - omega_m0
-    m = 3 / (8 * np.pi * G)
-    E_sq = omega_m0*np.exp(3*x) + omega_l0 * np.exp(3*x*(1+w_0+w_a)) * np.exp( -3*(w_a*(1-np.exp(-x))))
-    inner_log_func = m * H_0 ** 2 * E_sq
-    s_base = np.log(inner_log_func)
-
-    return s_base
-
 
 def linear(x, m, t):
     return m * x + t
@@ -67,7 +49,7 @@ for idx, fluct in enumerate(fluct_range):
 
     # samples = unpickle_me_this("real/further_analysis/desy5_3.pickle", absolute_path=False)
     # samples = unpickle_me_this(f"/Users/iason/PycharmProjects/Charm2/data_storage/desy5_low_fluct/all_pickles/{pickle}", absolute_path=True)
-    samples = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_6_union.pickle", absolute_path=True)
+    samples = unpickle_me_this(f"../../data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_6_union.pickle", absolute_path=True)
 
     # second_sample = unpickle_me_this("/Users/iason/PycharmProjects/Charm2/data_storage/fluct_is_not_constrained/real/PAPER_b0_0_2_union.pickle", absolute_path=True)
 
@@ -83,18 +65,18 @@ for idx, fluct in enumerate(fluct_range):
     # Extract and visualize posterior samples
     posterior_realizations_list = samples
 
-    calculate_evidence = True
-    ham = ift.StandardHamiltonian(likelihood, ic_sampling_lin)
-    if calculate_evidence:
-        elbo_samples, elbo_stats = ift.estimate_evidence_lower_bound(
-        hamiltonian=ham,
-        samples=samples,
-        n_eigenvalues=min(ham.domain.size, len(mu_u)),
-        batch_number=10,
-        )
-
-    print("elbo_samples: ", elbo_samples)
-    stop
+    # calculate_evidence = True
+    # ham = ift.StandardHamiltonian(likelihood, ic_sampling_lin)
+    # if calculate_evidence:
+    #     elbo_samples, elbo_stats = ift.estimate_evidence_lower_bound(
+    #     hamiltonian=ham,
+    #     samples=samples,
+    #     n_eigenvalues=min(ham.domain.size, len(mu_u)),
+    #     batch_number=10,
+    #     )
+    #
+    # print("elbo_samples: ", elbo_samples)
+    # stop
 
     # Signal Space Comparison Visualization
     # s_mode = calculate_approximate_mode(posterior_realizations_list, padding_operator=X, op=s)  # test function
@@ -112,7 +94,6 @@ for idx, fluct in enumerate(fluct_range):
 
 
     if plot_in_signal_space:
-        if cosmological:
             if extend:
                 posterior_samples = list(posterior_realizations_list.iterator(s))  # Nifty8 Field instances
                 posterior_samples_cleaned = [field.val for field in posterior_samples]  # Extracted values
@@ -121,11 +102,11 @@ for idx, fluct in enumerate(fluct_range):
             else:
 
                 posterior_samples = list(posterior_realizations_list.iterator(s))  # Nifty8 Field instances
+                # noinspection PyRedeclaration
                 posterior_samples_cleaned = [X.adjoint(field).val for field in posterior_samples]  # Extracted values
                 s_mean, s_var = posterior_realizations_list.sample_stat(s)
                 s_err = np.sqrt(X.adjoint(s_var).val)
                 s_mean = X.adjoint(s_mean)
-
 
                 # s_mean_2, s_var_2 = second_sample.sample_stat(s)
                 # s_mean_2 =  X.adjoint(s_mean_2)
@@ -146,8 +127,8 @@ for idx, fluct in enumerate(fluct_range):
                 # plt.plot(x.field().val, bf_line_to_signal- s_mean.val)  # max abs(res) = 0.15
                 # plt.show()
                 # stop
-                # popt = curve_fit(flat_lcdm, x.field().val, s_mean.val, sigma=s_err)
-                # popt2 = curve_fit(flat_evolving_dark_energy, x.field().val, s_mean.val, sigma=s_err)[0]
+                # popt = curve_fit(build_flat_lcdm_func, x.field().val, s_mean.val, sigma=s_err)
+                # popt2 = curve_fit(build_flat_evolving_dark_energy, x.field().val, s_mean.val, sigma=s_err)[0]
 
             plot_charm2_in_comparison_fields(x_max_pn=np.max(np.log(1 + z_p)), x_max_union=np.max(np.log(1 + z_u)),
                                              x_max_des=np.max(np.log(1 + z_d)), show=True, save=False, x=x.field().val,
@@ -157,8 +138,8 @@ for idx, fluct in enumerate(fluct_range):
                                              # additional_sample_labels="Pantheon 0.2=b0",
                                              # additional_samples=[s_mean_2.val,]
                                              # additional_samples=[
-                                             #     flat_lcdm( x.field().val, popt[0][0], popt[0][1] ),
-                                             #     flat_evolving_dark_energy(x.field().val, *popt2)]
+                                             #     build_flat_lcdm_func( x.field().val, popt[0][0], popt[0][1] ),
+                                             #     build_flat_evolving_dark_energy(x.field().val, *popt2)]
                                              # ,additional_sample_labels=["flat LCDM fit", "flat evolving dark energy fit"],
                                              # additional_samples=[
                                              #     posterior_line,
@@ -168,8 +149,6 @@ for idx, fluct in enumerate(fluct_range):
                                              # additional_sample_labels=["Posterior line", "Posterior cfm"],
                                              )
             plt.clf()
-        else:
-            raise ValueError("Synthetic comparison in signal space not implemented yet")
 
 
     if plot_in_data_space:

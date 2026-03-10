@@ -1,24 +1,12 @@
 from charm2 import *
 import numpy as np
+import nifty8 as ift
+ift.random.push_sseq_from_seed(42)
 
-# import sys
-# import traceback
-#
-# _old_write = sys.stdout.write
-#
-# def debug_write(text):
-#     if text.strip():  # ignore empty newlines
-#         print("\n--- STDOUT TRACE ---", file=sys.__stderr__)
-#         traceback.print_stack(limit=10, file=sys.__stderr__)
-#     return _old_write(text)
-#
-# sys.stdout.write = debug_write
+LH = synthetic_likelihood(init_fluctuations_parameter=0.2, n_dp=500)
 
-LH = cosmological_likelihood(data_to_use="DESY5", mode='flat_LCDM')
-
-global_iterations = 30
-kl_rate = lambda itr: 30
-
+global_iterations = 35
+kl_rate = lambda itr: 10
 
 inference_args = dict(likelihood_energy=LH.like,
                         total_iterations=global_iterations,
@@ -33,6 +21,6 @@ inference_args = dict(likelihood_energy=LH.like,
                             )
 
 
-posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=True, **inference_args)
+posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=False, **inference_args)
 
-plot_charm2(posterior_samples, LH, plot_domain="signal", plot_mode="real")
+plot_charm2(posterior_samples, LH, plot_domain="signal", plot_mode='synthetic')

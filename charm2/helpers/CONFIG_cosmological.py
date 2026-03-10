@@ -1,7 +1,8 @@
 import numpy as np
 from dataclasses import dataclass
 from .utilitites import *
-import nifty8 as ift
+# import nifty8 as ift
+import nifty.cl as ift
 from typing import Literal, Any
 
 # Defining necessary spaces, fields and operators:
@@ -75,10 +76,10 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
 
     # Arguments of the line model
     args_lm = {
-        #'slope': (2, 5),
-        'slope': (10, 10),
-        #'intercept': (30, 10)
-        'intercept': (30, 30)
+        'slope': (2, 5),
+        # 'slope': (10, 10),
+        'intercept': (30, 10)
+        # 'intercept': (30, 30)
     }
 
     X = ift.FieldZeroPadder(domain=x, new_shape=(x_fac*n_pix, ))
@@ -96,7 +97,7 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
 
         # Construct model
         s_cfm = CustomSimpleCorrelatedField(target=x_ext, **args_cfm, use_uniform_prior_on_fluctuations=True,
-                                            tukey_taper_ends=True)
+                                            tukey_taper_ends=False)
         s_line = LineModel(target=x_ext, args=args_lm)
         s = s_cfm + s_line
         s.line_model = s_line
@@ -182,7 +183,8 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon", "DESY5"]
 raise_warning("\nUnion2.1 covariance matrix is only symmetric up to a factor of 10^{-10}.\n"
               "Pantheon+ covariance matrix is only symmetric up to a factor of 10^{-4}.\n\n")
 
-# Also put iteration controlers into global namespace for simplicity right now
+# Also put iteration controlers into global namespace for simplicity right now, such that synthetic reconstructions
+# may also use these variables
 # Iteration control for `MGVI` and linear parts of the inference
 ic_sampling_lin = ift.AbsDeltaEnergyController(name="Precise linear sampling", deltaE=0.02, iteration_limit=100)
 

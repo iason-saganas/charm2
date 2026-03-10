@@ -1,30 +1,47 @@
+#from nifty8 import LikelihoodEnergyOperator, MultiDomain, MultiField, StandardHamiltonian, estimate_evidence_lower_bound
+# from nifty8.domain_tuple import DomainTuple
+# from nifty8.field import Field
+# from typing import Tuple, Any, Optional
+# from nifty8.operators.diagonal_operator import DiagonalOperator
+# from nifty8.operators.adder import Adder
+# from nifty8.library.los_response import LOSResponse
+# from nifty8.operators.operator import _OpChain
+# from nifty8.domains.unstructured_domain import UnstructuredDomain
+# from nifty8.operators.contraction_operator import ContractionOperator
+# from nifty8.operators.normal_operators import NormalTransform, LognormalTransform
+# from nifty8.minimization.optimize_kl import optimize_kl
+# from nifty8.domains.rg_space import RGSpace
+# from nifty8.operators.field_zero_padder import FieldZeroPadder
+# from nifty8.sugar import plot_priorsamples, from_random
+# from nifty8.utilities import lognormal_moments
+# from nifty8.operators.matrix_product_operator import MatrixProductOperator
+
+from nifty.cl import LikelihoodEnergyOperator, MultiDomain, MultiField, StandardHamiltonian, \
+    estimate_evidence_lower_bound, AnyArray
+from nifty.cl.domain_tuple import DomainTuple
+from nifty.cl.field import Field
+from typing import Tuple, Any, Optional
+from nifty.cl.operators.diagonal_operator import DiagonalOperator
+from nifty.cl.operators.adder import Adder
+from nifty.cl.library.los_response import LOSResponse
+from nifty.cl.operators.operator import _OpChain
+from nifty.cl.domains.unstructured_domain import UnstructuredDomain
+from nifty.cl.operators.contraction_operator import ContractionOperator
+from nifty.cl.operators.normal_operators import NormalTransform, LognormalTransform
+from nifty.cl.minimization.optimize_kl import optimize_kl
+from nifty.cl.domains.rg_space import RGSpace
+from nifty.cl.operators.field_zero_padder import FieldZeroPadder
+from nifty.cl.sugar import plot_priorsamples, from_random
+from nifty.cl.utilities import lognormal_moments
+from nifty.cl.operators.matrix_product_operator import MatrixProductOperator
+
 from matplotlib import pyplot as plt
-from nifty8 import LikelihoodEnergyOperator, MultiDomain, MultiField, StandardHamiltonian, estimate_evidence_lower_bound
-from nifty8.domain_tuple import DomainTuple
-from nifty8.field import Field
-import numpy as np
-from scipy.constants import c, G
-from scipy.optimize import curve_fit
-from typing import Tuple, Any
-from nifty8.operators.diagonal_operator import DiagonalOperator
-from nifty8.operators.adder import Adder
-from nifty8.library.los_response import LOSResponse
-from nifty8.operators.operator import _OpChain
-from nifty8.domains.unstructured_domain import UnstructuredDomain
-from nifty8.operators.contraction_operator import ContractionOperator
-from nifty8.operators.normal_operators import NormalTransform, LognormalTransform
-from nifty8.minimization.optimize_kl import optimize_kl
-from nifty8.domains.rg_space import RGSpace
-from nifty8.operators.field_zero_padder import FieldZeroPadder
 from charm2.style_components.matplotlib_style import *
 import pandas as pd
-from nifty8.operators.matrix_product_operator import MatrixProductOperator
 from dataclasses import dataclass
 import warnings
 import pickle
 from pathlib import Path
-from nifty8.sugar import plot_priorsamples, from_random
-from nifty8.utilities import lognormal_moments
 import gzip
 import os
 import shutil
@@ -32,6 +49,9 @@ import datetime
 import matplotlib.gridspec as gridspec
 from scipy.stats import norm
 from functools import partial
+import numpy as np
+from scipy.constants import c, G
+from scipy.optimize import curve_fit
 
 data_dir = Path(__file__).parent.parent / "raw_data"
 
@@ -47,7 +67,7 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'read_data_des', 'store_meta_data', 'get_datetime', 'read_data', 'plot_histogram',
            'plot_prior_cfm_samples', 'posterior_parameters', 'visualize_posterior_histograms',
            'construct_initial_position', 'evolving_dark_energy_fit', 'optimize_kl_and_store_metadata', '_LhContainer',
-           '_LhMetaContainer', 'FlatLCDM', 'FlatEDE']
+           '_LhMetaContainer', 'FlatLCDM', 'FlatEDE', 'data_dir']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -95,7 +115,7 @@ def FlatLCDM(target: RGSpace):
     Ωm = contraction.adjoint @ Ωm
 
     x_coord = DiagonalOperator(diagonal=x.field())
-    N = len(x.field().val)
+    N = len(x.field().val.asnumpy())
     three = Field.from_raw(domain=x, arr=3*np.ones(N))
 
     bracket_term = ((x_coord(three)).ptw("exp") - 1)
@@ -126,7 +146,7 @@ def FlatEDE(target: RGSpace):
     m = 3 / (8 * np.pi * G)
     x = target
     x_coord = DiagonalOperator(diagonal=x.field())
-    N  = len(x.field().val)
+    N  = len(x.field().val.asnumpy())
     contraction = ContractionOperator(domain=x, spaces=None)
 
     Ωm = StandardUniformTransform(upper_bound=1, key="EDE_Omega_m")
@@ -252,7 +272,7 @@ def unidirectional_radial_los(n_los: int, uniform_drawing=False, end_of_data=1.2
                 ends = np.concatenate((rndm,ends))
 
         ends = ends.flatten()
-        print("ends: ", ends)
+        # print("ends: ", ends)
         return ends
 
 
@@ -494,7 +514,7 @@ def read_data(data_to_use):
         raise ValueError(f"Can't read unknown data <{data_to_use}>")
 
 
-def spectral_decompose(matrix: np.ndarray, tol: float) -> Tuple:
+def spectral_decompose(matrix: AnyArray | np.ndarray, tol: float) -> Tuple:
     """
     Let 'matrix' be A, a strictly positive, symmetric matrix. Then, it has a decomposition via the spectral
     theorem:
@@ -511,8 +531,12 @@ def spectral_decompose(matrix: np.ndarray, tol: float) -> Tuple:
     :return: U D U^†, tuple, The decomposition
     """
     # Note that here, we use 'np.linalg.eigh' which is a routine explictly for symmetric matrices.
-    A = np.array(matrix)
+    if type(matrix) is AnyArray:
+        A = matrix.asnumpy()
+    else:
+        A = np.array(matrix)
     B = A.T
+
 
     # print("Decimals after the comma, A: ", str(A[0, 1]).split(".")[1])
     # print("Decimals after the comma, A.T: ", str(B[0, 1]).split(".")[1])
@@ -584,7 +608,7 @@ class CovarianceMatrix(MatrixProductOperator):
         """
         if not self.enable_transformation:
             raise ValueError("Can't get factor of Covariance matrix, `enable_transformation` is set to False.")
-        A = self._mat
+        A = self._mat.asnumpy()
         U, D, U_inv = spectral_decompose(A, tol=self.tol)
         square_root = U @ np.sqrt(D) @ U_inv
         sanity_check = np.allclose(A, square_root @ square_root, atol=self.tol, rtol=0)
@@ -1392,7 +1416,7 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
 
     # plot_comparison_fields(plot_fluctuations_scale_visualization=False, ax_object=custom_ax)
 
-    x = x.field().val
+    x = x.field().val.asnumpy()
     if custom_ax is None:
         custom_ax = plt.gca()
     custom_ax.vlines(np.max(x), 25, 40.5, linestyles='dashed', label="End of data", color="black",)
@@ -1447,7 +1471,7 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
 
     if further_samples is not None:
         for idx, s_sample in enumerate(further_samples):
-            custom_ax.plot(x, s_sample.val, label=labels_further_samples[idx], lw=1, markersize=0, ls="--", color="blue")
+            custom_ax.plot(x, s_sample.val.asnumpy(), label=labels_further_samples[idx], lw=1, markersize=0, ls="--", color="blue")
 
     x_reduced = remove_every_second(x, n=2)
     plot_evolving_dark_energy = False
@@ -1555,7 +1579,7 @@ def plot_synthetic_data(neg_scale_fac_mag: np.ndarray, data: np.ndarray, x_max_p
 
 
 def PiecewiseLinear(signal_space: RGSpace, omega_m_custom: float = None, omega_l_custom: float = None,
-                    high_curv=True, offset_custom:float = None):
+                    high_curv=False, offset_custom:float = None):
     """
     A generative line model for a piecewise linear function with two contributions.
     Represents a LCDM model with an offset of around 30.
@@ -1570,9 +1594,9 @@ def PiecewiseLinear(signal_space: RGSpace, omega_m_custom: float = None, omega_l
     x = signal_space
     expander = ContractionOperator(domain=x, spaces=None).adjoint
     if high_curv:
-        x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(5 * x.field().val))) # component goes with ~a^-5 (fictitious for high curvature)
+        x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(5 * x.field().val.asnumpy()))) # component goes with ~a^-5 (fictitious for high curvature)
     else:
-        x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(3 * x.field().val)))  # matter goes with ~a^-3
+        x_coord = DiagonalOperator(diagonal=Field(domain=DomainTuple.make(x), val=np.exp(3 * x.field().val.asnumpy())))  # matter goes with ~a^-3
 
     omega_m, m_deviation = (1, 1)
     omega_l, l_deviation = (1, 1)
@@ -1581,7 +1605,7 @@ def PiecewiseLinear(signal_space: RGSpace, omega_m_custom: float = None, omega_l
         omega_l, l_deviation = (omega_l_custom, 1e-16)
     contribution1 = expander @ LognormalTransform(omega_m, m_deviation, key="omega m contribution", N_copies=0)
     contribution2 = expander @ LognormalTransform(omega_l, l_deviation, key="omega l contribution", N_copies=0)
-    # adder = Adder(a=Field(domain=DomainTuple.make(x), val=30 * np.ones(len(x.field().val))))
+    # adder = Adder(a=Field(domain=DomainTuple.make(x), val=30 * np.ones(len(x.field().val.asnumpy()))))
     raise_warning("In `utilities.py -> PiecewiseLinear` I am setting H0 to the s_SN value.")
     if offset_custom:
         offset = expander @ NormalTransform(offset_custom, 1e-16, key="offset of piecewise linear")
@@ -1637,7 +1661,7 @@ def plot_histogram(mean: float, sigma: float, n_samples: int, vlines: np.array =
         print("Uniform distribution")
         op = StandardUniformTransform(key='Uniform for Histogram', N_copies=0,
                                       upper_bound=sigma, shift=mean)
-    op_samples = np.array([op(s).val for s in [from_random(op.domain) for i in range(n_samples)]])
+    op_samples = np.array([op(s).val.asnumpy() for s in [from_random(op.domain) for i in range(n_samples)]])
     label = rf"{mode} with $(\mu, \sigma)=$" + f"$({mean}, {sigma})$" if not (mode=="Uniform") else rf"{mode} in " + r"$\mathrm{[0,1]}$"
     plt.hist(op_samples, bins=200, label=label,
              histtype='step', facecolor='white', color=color)
@@ -1963,7 +1987,7 @@ def pointwise_mode(arrays):
 def calculate_approximate_mode(posterior_realizations_list, padding_operator, op):
     cropping = padding_operator.adjoint
     posterior_samples = list(posterior_realizations_list.iterator(op))  # Nifty8 Field instances
-    posterior_samples_cleaned = [cropping(field).val for field in posterior_samples] # Extracted values
+    posterior_samples_cleaned = [cropping(field).val.asnumpy() for field in posterior_samples] # Extracted values
     return pointwise_mode(posterior_samples_cleaned)
 
 
@@ -1976,12 +2000,12 @@ def plot_prior_cfm_samples(op, n, x):
     :return:
     """
     samples = list(op(from_random(op.domain)) for _ in range(n))
-    fields = [sample.val for sample in samples]
+    fields = [sample.val.asnumpy() for sample in samples]
     h = np.array(fields).flatten()
     abs_min, abs_max = (np.min(h), np.max(h))
     for prior_field in samples:
-        if max(prior_field.val) < 32.1:
-            plt.plot(x.field().val, prior_field.val, lw=2, color=(0,0,0,0.6), markersize=0, ls="-")
+        if max(prior_field.val.asnumpy()) < 32.1:
+            plt.plot(x.field().val.asnumpy(), prior_field.val.asnumpy(), lw=2, color=(0,0,0,0.6), markersize=0, ls="-")
     plt.ylim(29.5, 32.2)
     plt.xlabel(r"$x=-\mathrm{ln}(a)=\mathrm{ln}(1+z)$")
     plt.ylabel("Prior samples $s(x)$")
@@ -2030,7 +2054,7 @@ def posterior_parameters(posterior_samples, signal_model, upper_bound_on_fluct =
                 xi: DomainTuple, len: 1
                 * RGSpace(shape=(8192,), distances=(np.float64(0.41689683388895465),), harmonic=True)
 
-        print(mySample.val)
+        print(mySample.val.asnumpy())
 
         >> {'fluctuations': array(0.34721649),
             'line model slope': array(0.21637945),
@@ -2078,11 +2102,11 @@ def posterior_parameters(posterior_samples, signal_model, upper_bound_on_fluct =
     IMPORTANT: In order for this function to work the following two print statements are needed:
 
     File: nifty8 > operators > adder.py
-    Print statement: print((x + self._a).val, ";")
+    Print statement: print((x + self._a).val.asnumpy(), ";")
     Where: In the apply method of the Adder class directly before returning
 
     File: nifty8 > operators > operator.py
-    Print statement: print("Fluctuations: ", res.val, ";")
+    Print statement: print("Fluctuations: ", res.val.asnumpy(), ";")
     Where: In the apply method of the _FunctionApplier class directly before returning
 
     File: nifty8 > operators > normal_operators.py
@@ -2294,7 +2318,7 @@ def construct_initial_position(n_pix_ext, distances, fluctuations, apply_prior_l
     But in reality, the xi_s values seem to have some structure. To see this, you may do:
 
     posterior_samples, final_pos = ift.optimize_kl(return_final_pos = True etc...)
-    plt.plot(final_pos.val["xi"])
+    plt.plot(final_pos.val.asnumpy()["xi"])
     plt.show()
 
     UPDATE: Now I am using the mean xi's array of posterior Union2.1 samples.
@@ -2304,7 +2328,8 @@ def construct_initial_position(n_pix_ext, distances, fluctuations, apply_prior_l
     :parameter: fluctuations:  : The wished point-wise std of the field.
     :return:
     """
-    import nifty8 as ift
+    # import nifty8 as ift
+    import nifty.cl as ift
 
     scalar_domain = ift.DomainTuple.scalar_domain()
     harmonic_RGspace = ift.RGSpace(n_pix_ext, distances=distances).get_default_codomain()
@@ -2365,8 +2390,9 @@ class _LhMetaContainer:
     b0: np.float64          # The initial b0 parameter from which `init_pos` was calculated
     noise_cov: CovarianceMatrix
     dataset_name: str
-    mode: str   # Either `non-parametric` or `parametric flat LCDM`
+    mode: str   # Either `non-parametric`, `flat_LCDM`, `flat_EDE` or `synth`
     ic_and_minimizers: tuple  # tuple of: (ic_sampling_lin, ic_sampling_nl, geoVI_sampling_minimizer, ic_newton, descent_finder)
+    ground_truth_field: Optional[Field]=None     # If synthetic reconstructions are used
 
 
 @dataclass
@@ -2379,7 +2405,7 @@ def inspect_callback(out_name, LH_dataclass: _LhContainer, samples, global_iter)
     LH = LH_dataclass
     s_model = LH.meta.s_model
     cutter = LH.meta.ZP.adjoint
-    x = LH.meta.x.field().val
+    x = LH.meta.x.field().val.asnumpy()
     mode = LH.meta.mode
 
     folder_name = out_name + "/fw_model/"
@@ -2387,8 +2413,9 @@ def inspect_callback(out_name, LH_dataclass: _LhContainer, samples, global_iter)
     fn = folder_name + "mean_fw_model_iter_" + str(global_iter)
 
     s_model_samples = [s_model(sl) for sl in samples.iterator()]
-    s_model_samples = [cutter(sl).val for sl in s_model_samples]
+    s_model_samples = [cutter(sl).val.asnumpy() for sl in s_model_samples]
     mean_fw_model = np.mean(s_model_samples, axis=0)
+    fw_model_std = np.std(s_model_samples, axis=0)
 
     if mode == 'non-parametric':
         s_line = s_model.line_model
@@ -2408,18 +2435,25 @@ def inspect_callback(out_name, LH_dataclass: _LhContainer, samples, global_iter)
             relevant_line_model_latent_samples.append(relevant_sample)
 
         line_model_samples = [s_line(sl) for sl in relevant_line_model_latent_samples]
-        line_model_samples = [cutter(sl).val for sl in line_model_samples]
+        line_model_samples = [cutter(sl).val.asnumpy() for sl in line_model_samples]
 
         mean_line = np.mean(line_model_samples, axis=0)
 
         plt.plot(x, mean_line, label="mean line", linestyle='--', color="gray")
 
-    plot_comparison_fields()
+    plt.fill_between(x, mean_fw_model - fw_model_std, mean_fw_model + fw_model_std, color=light_blue)
     plt.plot(x, mean_fw_model, label="mean fw", color=blue, lw=2)
+    if LH.meta.dataset_name == 'synthetic':
+        ground_truth_field = LH.meta.ground_truth_field
+        plt.plot(x, cutter(ground_truth_field).val.asnumpy(), label="ground truth field", linestyle='-', color="black")
+    else:
+        plot_comparison_fields()
+        plt.xlim(0, 1.2)
+        plt.ylim(29.5, 32)
+
     plt.xlabel(r"$x=-\mathrm{ln}(a)$")
     plt.ylabel("$s(x)$")
-    plt.xlim(0, 1.2)
-    plt.ylim(29.5, 32)
+    plt.legend()
     plt.tight_layout()
     plt.savefig(fn)
     plt.close()
@@ -2433,9 +2467,10 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
     :return:
     """
     LH = LH_dataclass
-    out_name = f'inferences/real/{LH.meta.b0}/{LH.meta.dataset_name}_{LH.meta.mode}/'
-    callback = partial(inspect_callback, out_name, LH)
     mode = LH.meta.mode
+    model_mode = f"_{mode}" if mode != "" else mode
+    out_name = f'inferences/{LH.meta.b0}/{LH.meta.dataset_name}{model_mode}/'
+    callback = partial(inspect_callback, out_name, LH)
 
     from time import time
     inference_start = time()
@@ -2448,9 +2483,9 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
     # pickle_me_this(f"real/{now}", posterior_samples)
 
     s_mean, s_var = posterior_samples.sample_stat(LH.meta.s_model)
-    s_err = np.sqrt(LH.meta.ZP.adjoint(s_var).val)
+    s_err = np.sqrt(LH.meta.ZP.adjoint(s_var).val.asnumpy())
 
-    current_expansion_mean, current_expansion_err = current_expansion_rate(LH.meta.ZP.adjoint(s_mean).val, s_err)
+    current_expansion_mean, current_expansion_err = current_expansion_rate(LH.meta.ZP.adjoint(s_mean).val.asnumpy(), s_err)
     H0_estimate = f"Calculated value of H0: {current_expansion_mean} ± {current_expansion_err}"
 
     note = ""
@@ -2482,15 +2517,34 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
         elbo_samples, elbo_stats = estimate_evidence_lower_bound(
                 hamiltonian=ham,
                 samples=posterior_samples,
-                n_eigenvalues=min(ham.domain.size, len(LH.meta.d.val)),
+                # n_eigenvalues=min(ham.domain.size, len(LH.meta.d.val.asnumpy())),
+                n_eigenvalues=0,
+                compute_all=True,
+                analytic_prior_term=True,
                 n_batches=10,
             )
-        elbo_stats = {k: fld.val for k, fld in elbo_stats.items()}
+        elbo_stats = {k: fld.val.asnumpy() for k, fld in elbo_stats.items()}
 
-        note +=f"\nElbo stats: {elbo_stats}"
+        elbo_info = (
+            f"\nELBO:\n"
+            f"  {elbo_stats['elbo_mean']:.6} + ({abs(elbo_stats['elbo_mean']) - abs(elbo_stats['elbo_up']):.6})"
+            f" - ({abs(elbo_stats['elbo_mean']) - abs(elbo_stats['elbo_lw']):.6})\n"
+            f"Other stats:\n"
+            f"  lower_error     : {elbo_stats['lower_error']:.6e}\n"
+            f"  trace_inv_exact : {elbo_stats.get('trace_inv_exact', 0.):.6e}\n"
+            f"  trace_inv_const : {elbo_stats.get('trace_inv_const', 0.):.6e}\n"
+            f"  trace_inv_total : {elbo_stats.get('trace_inv_total', 0.):.6e}\n"
+            f"  prior_mean_sq   : {elbo_stats.get('prior_mean_sq', 0.):.6e}\n"
+            f"  prior_term      : {elbo_stats.get('prior_term', 0.):.6e}"
+        )
 
-    new_store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(LH.meta.d.val), expansion_rate=H0_estimate,
-                        inference_type='real', signal_model_param=LH.meta.s_mdl_meta, other=note,
+
+        # note +=f"\nElbo stats: {elbo_stats}"
+        note += elbo_info
+
+    i_type = 'real' if LH.meta.dataset_name != 'synthetic' else 'synthetic'
+    new_store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(LH.meta.d.val.asnumpy()), expansion_rate=H0_estimate,
+                        inference_type=i_type, signal_model_param=LH.meta.s_mdl_meta, other=note,
                         global_kl_iterations=kwargs['total_iterations'], folder_name=f"cache", data_storage_dir_name=out_name)
 
 
@@ -2507,8 +2561,8 @@ def _get_posterior_flat_LCDM_samples(posterior_samples):
     H0_relevant_samples = [mf.extract(H0.domain) for mf in sl_gen]
     Omega_m_relevant_samples = [mf.extract(Ωm.domain) for mf in sl_gen]
 
-    H0_relevant_samples = [sl.val['flat_lcdm_H0'] for sl in H0_relevant_samples]
-    Omega_m_relevant_samples = [sl.val['flat_lcdm_Omega_m'] for sl in Omega_m_relevant_samples]
+    H0_relevant_samples = [sl.val['flat_lcdm_H0'].asnumpy() for sl in H0_relevant_samples]
+    Omega_m_relevant_samples = [sl.val['flat_lcdm_Omega_m'].asnumpy() for sl in Omega_m_relevant_samples]
 
     posterior_H0_samples = np.array([100 * norm.cdf(xi) for xi in H0_relevant_samples])
     posterior_omega_m_samples = np.array([norm.cdf(xi) for xi in Omega_m_relevant_samples])
@@ -2535,10 +2589,10 @@ def _get_posterior_flat_EDE_samples(posterior_samples):
 
     sl_gen = list(posterior_samples.iterator())
 
-    Ωm_xi = [mf.extract(Ωm.domain).val["EDE_Omega_m"] for mf in sl_gen]
-    H0_xi = [mf.extract(H0.domain).val["EDE_Omega_H0"] for mf in sl_gen]
-    w0_xi = [mf.extract(w0.domain).val["EDE_w0"] for mf in sl_gen]
-    wa_xi = [mf.extract(wa.domain).val["EDE_wa"] for mf in sl_gen]
+    Ωm_xi = [mf.extract(Ωm.domain).val["EDE_Omega_m"].asnumpy() for mf in sl_gen]
+    H0_xi = [mf.extract(H0.domain).val["EDE_Omega_H0"].asnumpy() for mf in sl_gen]
+    w0_xi = [mf.extract(w0.domain).val["EDE_w0"].asnumpy() for mf in sl_gen]
+    wa_xi = [mf.extract(wa.domain).val["EDE_wa"].asnumpy() for mf in sl_gen]
 
     Ωm_samples = norm.cdf(np.array(Ωm_xi))
     H0_samples = 100 * norm.cdf(np.array(H0_xi))

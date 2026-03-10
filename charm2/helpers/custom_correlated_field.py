@@ -19,26 +19,44 @@
 from warnings import warn
 
 import numpy as np
-from nifty8 import MaskOperator
 
-from nifty8.domain_tuple import DomainTuple
-from nifty8.domains.power_space import PowerSpace
-from nifty8.operators.adder import Adder
-from nifty8.operators.contraction_operator import ContractionOperator
-from nifty8.operators.distributors import PowerDistributor
-from nifty8.operators.harmonic_operators import HarmonicTransformOperator
-from nifty8.operators.normal_operators import LognormalTransform, NormalTransform
-from nifty8.operators.simple_linear_operators import ducktape
-from nifty8.operators.value_inserter import ValueInserter
-from nifty8.sugar import full, makeField, makeOp
-from nifty8.library.correlated_fields import (_log_vol, _Normalization,
+#from nifty8 import MaskOperator
+# from nifty8.domain_tuple import DomainTuple
+# from nifty8.domains.power_space import PowerSpace
+# from nifty8.operators.adder import Adder
+# from nifty8.operators.contraction_operator import ContractionOperator
+# from nifty8.operators.distributors import PowerDistributor
+# from nifty8.operators.harmonic_operators import HarmonicTransformOperator
+# from nifty8.operators.normal_operators import LognormalTransform, NormalTransform
+# from nifty8.operators.simple_linear_operators import ducktape
+# from nifty8.operators.value_inserter import ValueInserter
+# from nifty8.sugar import full, makeField, makeOp
+# from nifty8.library.correlated_fields import (_log_vol, _Normalization,
+#                                 _relative_log_k_lengths, _SlopeRemover,
+#                                 _TwoLogIntegrations)
+# from nifty8.operators.diagonal_operator import DiagonalOperator
+# from nifty8.field import Field
+# from nifty8.operators.matrix_product_operator import MatrixProductOperator
+
+from nifty.cl import MaskOperator
+from nifty.cl.domain_tuple import DomainTuple
+from nifty.cl.domains.power_space import PowerSpace
+from nifty.cl.operators.adder import Adder
+from nifty.cl.operators.contraction_operator import ContractionOperator
+from nifty.cl.operators.distributors import PowerDistributor
+from nifty.cl.operators.harmonic_operators import HarmonicTransformOperator
+from nifty.cl.operators.normal_operators import LognormalTransform, NormalTransform
+from nifty.cl.operators.simple_linear_operators import ducktape
+from nifty.cl.operators.value_inserter import ValueInserter
+from nifty.cl.sugar import full, makeField, makeOp
+from nifty.cl.library.correlated_fields import (_log_vol, _Normalization,
                                 _relative_log_k_lengths, _SlopeRemover,
                                 _TwoLogIntegrations)
+from nifty.cl.operators.diagonal_operator import DiagonalOperator
+from nifty.cl.field import Field
+from nifty.cl.operators.matrix_product_operator import MatrixProductOperator
 
-from nifty8.operators.diagonal_operator import DiagonalOperator
 
-from nifty8.field import Field
-from nifty8.operators.matrix_product_operator import MatrixProductOperator
 from scipy.signal.windows import tukey
 
 from .custom_normal_operators import StandardUniformTransform
@@ -481,10 +499,15 @@ def SimpleNonStationaryField(
 
 import numpy as np
 
-from nifty8.domain_tuple import DomainTuple
-from nifty8.domains.unstructured_domain import UnstructuredDomain
-from nifty8.field import Field
-from nifty8.operators.linear_operator import LinearOperator
+# from nifty8.domain_tuple import DomainTuple
+# from nifty8.domains.unstructured_domain import UnstructuredDomain
+# from nifty8.field import Field
+# from nifty8.operators.linear_operator import LinearOperator
+
+from nifty.cl.domain_tuple import DomainTuple
+from nifty.cl.domains.unstructured_domain import UnstructuredDomain
+from nifty.cl.field import Field
+from nifty.cl.operators.linear_operator import LinearOperator
 
 
 class CustomMaskOperator(LinearOperator):
@@ -631,7 +654,8 @@ def customCFM(target,
 
     return op
 
-from nifty8.operators.field_zero_padder import FieldZeroPadder
+# from nifty8.operators.field_zero_padder import FieldZeroPadder
+from nifty.cl.operators.field_zero_padder import FieldZeroPadder
 
 def weirdCFM(target,
     offset_mean,
@@ -669,7 +693,8 @@ def weirdCFM(target,
 
     return sum(ops)
 
-from nifty8.domains import RGSpace
+# from nifty8.domains import RGSpace
+from nifty.cl.domains import RGSpace
 
 def RGSpace_cutter(rg_space, to_cut):
     n = rg_space.shape[0]

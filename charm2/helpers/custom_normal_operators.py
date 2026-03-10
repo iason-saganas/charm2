@@ -17,13 +17,21 @@
 
 import numpy as np
 
-from nifty8.domain_tuple import DomainTuple
-from nifty8.domains.unstructured_domain import UnstructuredDomain
-from nifty8.operators.adder import Adder
-from nifty8.operators.diagonal_operator import DiagonalOperator
-from nifty8.operators.simple_linear_operators import ducktape
-from nifty8.sugar import makeField
-from nifty8.utilities import lognormal_moments, value_reshaper
+# from nifty8.domain_tuple import DomainTuple
+# from nifty8.domains.unstructured_domain import UnstructuredDomain
+# from nifty8.operators.adder import Adder
+# from nifty8.operators.diagonal_operator import DiagonalOperator
+# from nifty8.operators.simple_linear_operators import ducktape
+# from nifty8.sugar import makeField
+# from nifty8.utilities import lognormal_moments, value_reshaper
+
+from nifty.cl.domain_tuple import DomainTuple
+from nifty.cl.domains.unstructured_domain import UnstructuredDomain
+from nifty.cl.operators.adder import Adder
+from nifty.cl.operators.diagonal_operator import DiagonalOperator
+from nifty.cl.operators.simple_linear_operators import ducktape
+from nifty.cl.sugar import makeField
+from nifty.cl.utilities import lognormal_moments, value_reshaper
 
 __all__ = ['StandardUniformTransform']
 
