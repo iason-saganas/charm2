@@ -1,6 +1,7 @@
 from charm2 import *
 import numpy as np
-import nifty8 as ift
+# import nifty8 as ift
+import nifty.cl as ift
 ift.random.push_sseq_from_seed(42)
 
 LH = synthetic_likelihood(init_fluctuations_parameter=0.2, n_dp=500)
