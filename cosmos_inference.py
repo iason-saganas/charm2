@@ -14,10 +14,11 @@ import numpy as np
 #
 # sys.stdout.write = debug_write
 
-LH = cosmological_likelihood(data_to_use="DESY5", mode='flat_LCDM')
+LH = cosmological_likelihood(data_to_use="DESY5", mode='non-parametric', init_fluctuations_parameter=0.1)
+# LH = cosmological_likelihood(data_to_use="DESY5", mode='flat_LCDM')
 
-global_iterations = 30
-kl_rate = lambda itr: 30
+global_iterations = 100
+kl_rate = lambda itr: 30 if itr < 98 else 100
 
 
 inference_args = dict(likelihood_energy=LH.like,
@@ -33,6 +34,6 @@ inference_args = dict(likelihood_energy=LH.like,
                             )
 
 
-posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=True, **inference_args)
+posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=False, **inference_args)
 
 plot_charm2(posterior_samples, LH, plot_domain="signal", plot_mode="real")

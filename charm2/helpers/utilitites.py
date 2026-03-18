@@ -20,7 +20,7 @@ from nifty.cl import LikelihoodEnergyOperator, MultiDomain, MultiField, Standard
     estimate_evidence_lower_bound, AnyArray
 from nifty.cl.domain_tuple import DomainTuple
 from nifty.cl.field import Field
-from typing import Tuple, Any, Optional
+from typing import Tuple, Any, Optional, Literal
 from nifty.cl.operators.diagonal_operator import DiagonalOperator
 from nifty.cl.operators.adder import Adder
 from nifty.cl.library.los_response import LOSResponse
@@ -67,7 +67,7 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'read_data_des', 'store_meta_data', 'get_datetime', 'read_data', 'plot_histogram',
            'plot_prior_cfm_samples', 'posterior_parameters', 'visualize_posterior_histograms',
            'construct_initial_position', 'evolving_dark_energy_fit', 'optimize_kl_and_store_metadata', '_LhContainer',
-           '_LhMetaContainer', 'FlatLCDM', 'FlatEDE', 'data_dir']
+           '_LhMetaContainer', 'FlatLCDM', 'FlatEDE', 'data_dir', 'signal_from_H0', 'DataArgs', 'GroundTruthArgs']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -130,7 +130,7 @@ def FlatLCDM(target: RGSpace):
     return s
 
 
-def FlatEDE(target: RGSpace):
+def FlatEDE(target: RGSpace, custom_parameter_values: Optional[dict] = None):
     """
     Assuming uniform priors in
 
@@ -140,6 +140,11 @@ def FlatEDE(target: RGSpace):
         H0 ~ [0,100]
 
     such that the posterior values found in https://arxiv.org/pdf/2401.02929 are well inside those intervals.
+
+    custom_parameter_values
+        If a dict with keys `Ωm`, `H0`, `w0` and `wa`, Gaussian distributions with uncertainties >0 will be used for
+        priors instead. Useful for, e.g., synthetic inference.
+
     :param target: The target signal space.
     :return:
     """
@@ -153,6 +158,12 @@ def FlatEDE(target: RGSpace):
     H0 = StandardUniformTransform(upper_bound=100, key="EDE_Omega_H0")
     w0 = StandardUniformTransform(shift=-2, upper_bound=2*2, key="EDE_w0")
     wa = StandardUniformTransform(shift=-15, upper_bound=2*15, key="EDE_wa")
+    if custom_parameter_values is not None:
+        dct = custom_parameter_values
+        Ωm = NormalTransform(mean=dct['Ωm'], sigma=1e-16, key="EDE_Omega_m")
+        H0 = NormalTransform(mean=dct['H0'], sigma=1e-16, key="EDE_Omega_H0")
+        w0 = NormalTransform(mean=dct['w0'], sigma=1e-16, key="EDE_w0")
+        wa = NormalTransform(mean=dct['wa'], sigma=1e-16, key="EDE_wa")
 
     Ωm =  contraction.adjoint @ Ωm
     H0 = contraction.adjoint @ H0
@@ -922,8 +933,10 @@ def new_store_meta_data(name, duration_of_inference, len_d, inference_type, sign
 
     # Ensure final directory exists
     os.makedirs(final_dir, exist_ok=True)
+    meta_data_exists = os.path.exists(os.path.join(final_dir, filename))
 
-
+    if meta_data_exists:
+        return
     # Create the metadata file
     with open(filename, 'w') as file:
         file.write(f"Charm2 inference run on the {transform_datetime_string(name)}. Mode: {inference_type}\n")
@@ -1015,6 +1028,16 @@ def current_expansion_rate(s: np.array, delta_s: np.array = None) -> float:
         delta_H = 1 / 2 * (8 * np.pi * G / 3 * np.exp(s0)) ** (1 / 2) * delta_s0
         return np.round(H0, 2), np.round(delta_H, 5)
 
+
+def signal_from_H0(H0: float) -> float:
+    """
+    Inverse of current_expansion_rate (ignoring uncertainties).
+
+    Returns s0 such that:
+    H0 = sqrt(8πG/3 * exp(s0))
+    """
+    s0 = np.log(3 * H0**2 / (8 * np.pi * G))
+    return s0
 
 def chi_square_dof(real, model, inv_cov):
     # Compute squared differences, input the inverse noise covariance to calculate the chi^2_dof
@@ -1400,7 +1423,7 @@ def plot_charm1_in_comparison_fields(show: bool = False, save: bool = True, disa
               save_filename=filename, show=show, loc="upper left", disable_legend=True)
 
 
-def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: float, show=True, save=True,
+def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: float, show=True, save=False,
                                 reconstruction: tuple = None, custom_ax = None, further_samples = None,
                                 labels_further_samples = None,):
     """
@@ -2378,6 +2401,43 @@ def construct_initial_position(n_pix_ext, distances, fluctuations, apply_prior_l
 
 
 @dataclass
+class DataArgs:
+    """
+    n_dp
+        The number of datapoints to generate.
+    uniform_drawing
+        If True, redshifts are drawn over the full space with equal probability. If False, the probability of sampling
+        falls of exponentially with redshift
+    use_des_like_data_distribution
+        If True, overrides `uniform_drawing` and the number of data points such that the synthetic data are distributed
+        similarly to the DESY5 dataset.
+    """
+    n_dp: int = 500
+    uniform_drawing: bool = False
+    use_des_like_data_distribution: bool = False
+
+
+@dataclass
+class GroundTruthArgs:
+    """
+    If mode is `flat_LCDM`, Ωm0 and H0 have to be specified.
+        E.g., for s_SN: (Ωm0, H0) = 0.334, 70.29
+    If mode is `flat_EDE`, all other parameters have to be specified as well.
+        E.g., for DESY5: (Ωm0, w0, wa) = 0.495, -0.36, -8.8
+    If mode is `non-parametric`, the initial fluctuations parameter b0, slope m0, and H0 have to be specified.
+    H0 is converted to the y intersection of the line model.
+        E.g.: (b0, H0, m0) = (0.2, 70, 2)
+    """
+    mode: Literal["flat_LCDM", "flat_EDE", "non-parametric"]
+    Ωm0: float = 0.334
+    H0: float = 70.29  # corresponds to offset of 29.81 in the signal field. s_SN value.
+    w0: float = -0.36  # found by DESY5
+    wa: float = -8.8  # found by DESY5
+    b0: float = None
+    m0: float = None
+
+
+@dataclass
 class _LhMetaContainer:
     d: Field           # The data array
     neg_a_mag: np.ndarray   # array of -ln(a)
@@ -2392,7 +2452,10 @@ class _LhMetaContainer:
     dataset_name: str
     mode: str   # Either `non-parametric`, `flat_LCDM`, `flat_EDE` or `synth`
     ic_and_minimizers: tuple  # tuple of: (ic_sampling_lin, ic_sampling_nl, geoVI_sampling_minimizer, ic_newton, descent_finder)
-    ground_truth_field: Optional[Field]=None     # If synthetic reconstructions are used
+    # Further optional arguments for synthetic reconstructions
+    ground_truth_field: Optional[Field]=None
+    data_generation_args: Optional[DataArgs]=None
+    ground_truth_args: Optional[GroundTruthArgs]=None
 
 
 @dataclass
@@ -2474,13 +2537,12 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
 
     from time import time
     inference_start = time()
+
     posterior_samples = optimize_kl(output_directory=out_name, inspect_callback=callback, **kwargs)
+
     inference_end = time()
     inference_duration = inference_end - inference_start
-
     now = get_datetime()
-    # Save the inference run
-    # pickle_me_this(f"real/{now}", posterior_samples)
 
     s_mean, s_var = posterior_samples.sample_stat(LH.meta.s_model)
     s_err = np.sqrt(LH.meta.ZP.adjoint(s_var).val.asnumpy())
@@ -2538,11 +2600,29 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
             f"  prior_term      : {elbo_stats.get('prior_term', 0.):.6e}"
         )
 
-
-        # note +=f"\nElbo stats: {elbo_stats}"
         note += elbo_info
 
     i_type = 'real' if LH.meta.dataset_name != 'synthetic' else 'synthetic'
+
+    if i_type == 'synthetic':
+        data_gen_info = (
+            f"\nData generation:\n"
+            f"  n_dp = {LH.meta.data_generation_args.n_dp}\n"
+            f"  uniform_drawing = {LH.meta.data_generation_args.uniform_drawing}\n"
+            f"  use_des_like_data_distribution = {LH.meta.data_generation_args.use_des_like_data_distribution}\n"
+        )
+
+        ground_gen_info = (
+            f"Ground truth:\n"
+            f"  mode = {LH.meta.ground_truth_args.mode}\n"
+            f"  Ωm0 = {LH.meta.ground_truth_args.Ωm0}\n"
+            f"  H0 = {LH.meta.ground_truth_args.H0}\n"
+            f"  w0 = {LH.meta.ground_truth_args.w0}\n"
+            f"  wa = {LH.meta.ground_truth_args.wa}\n"
+        )
+
+        note += data_gen_info + ground_gen_info
+
     new_store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(LH.meta.d.val.asnumpy()), expansion_rate=H0_estimate,
                         inference_type=i_type, signal_model_param=LH.meta.s_mdl_meta, other=note,
                         global_kl_iterations=kwargs['total_iterations'], folder_name=f"cache", data_storage_dir_name=out_name)
