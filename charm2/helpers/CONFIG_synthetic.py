@@ -38,16 +38,21 @@ def synthetic_likelihood(init_fluctuations_parameter, data_generation_args:DataA
                                                     model.
     :return:
     """
+    if mode != "non-parametric":
+        init_fluctuations_parameter = None  # override in case accidentally given
     dga = data_generation_args
-    n_dp, use_des_like_data_distribution, uniform_drawing = (dga.n_dp, dga.use_des_like_data_distribution,
-                                                             dga.uniform_drawing)
+    n_dp, use_des_like_data_distribution, uniform_drawing, cov = (dga.n_dp, dga.use_des_like_data_distribution,
+                                                             dga.uniform_drawing, dga.noise_covariance)
     if use_des_like_data_distribution:
         des_hist_edges = np.loadtxt(f"{data_dir}/desy5_data_histogram_bin_edges.txt")
         des_hist_counts = np.loadtxt(f"{data_dir}/desy5_data_histogram_bin_counts.txt")
         n_dp = 1829
-        neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=True, end_of_data=0.7514160887, specific_hist=(des_hist_edges, des_hist_counts))  # The negative scale factor magnitude,
-        # x = -log(a) = log(1+z)
+
+        # The negative scale factor magnitude, x = -log(a) = log(1+z)
+        neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=True, end_of_data=0.7514160887, specific_hist=(des_hist_edges, des_hist_counts))
     else:
+        if cov is not None:
+            n_dp = cov.shape[0]
         neg_a_mag = unidirectional_radial_los(n_dp, uniform_drawing=uniform_drawing)
 
     config = {
@@ -165,10 +170,16 @@ def synthetic_likelihood(init_fluctuations_parameter, data_generation_args:DataA
 
     # Build the signal response, noise operator, data field and others
     R = build_response(signal_space=x, signal=X.adjoint @ s, data_space=data_space, neg_scale_factor_mag=neg_a_mag)
-    R_g = build_response(signal_space=x, signal=X.adjoint @ s_g, data_space=data_space, neg_scale_factor_mag=neg_a_mag)
     # Ground truth response
-    N = ift.ScalingOperator(domain=(data_space, ), factor=noise_level, sampling_dtype=np.float64)
+    R_g = build_response(signal_space=x, signal=X.adjoint @ s_g, data_space=data_space, neg_scale_factor_mag=neg_a_mag)
 
+    # Noise operator
+    if cov is None:
+        N = ift.ScalingOperator(domain=(data_space, ), factor=noise_level, sampling_dtype=np.float64)
+        cov = noise_level * np.ones((n_dp, n_dp), dtype=np.float64)
+    else:
+        N = CovarianceMatrix(domain=data_space, matrix=cov, sampling_dtype=np.float64, tol=1e-4,
+                             enable_transformation=True)
 
     # Construct random ground truth domain field
     ground_truth_model = ift.from_random(s_g.domain)
@@ -198,9 +209,10 @@ def synthetic_likelihood(init_fluctuations_parameter, data_generation_args:DataA
         mode_info = 'exponential_drawing_'
     mode_info += 'ground_is_' + ground_truth_args.mode  # 'flat_EDE', 'flat_LCDM' or 'non-parametric'
     mode_info += '_while_s_model_is_' + mode
-    LH_meta = _LhMetaContainer(d=d, neg_a_mag=neg_a_mag, s_model=s, s_mdl_meta=arguments,
+
+    LH_meta = _LhMetaContainer(d=d, neg_a_mag=neg_a_mag, s_model=s, s_mdl_meta=arguments, response=R,
                                x=x, ZP=X, init_pos=initial_pos, b0=init_fluctuations_parameter,
-                               noise_cov=N, dataset_name="synthetic", mode=mode_info,
+                               noise_cov=cov, dataset_name="synthetic", mode=mode_info,
                                ic_and_minimizers=ic_and_minimizers, ground_truth_field=ground_truth_field,
                                ground_truth_args=ground_truth_args, data_generation_args=dga,)
     LH = _LhContainer(like=likelihood_energy, meta=LH_meta)

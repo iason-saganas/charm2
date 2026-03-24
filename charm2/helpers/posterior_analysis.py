@@ -34,7 +34,7 @@ def _plot_data_domain():
     raise NotImplementedError
 
 
-def plot_charm2(posterior_samples, LH:_LhContainer, plot_mode:Literal["real", "synthetic"], show=True, save=False,
+def plot_charm2(posterior_samples, LH:_LhContainer, plot_mode:Literal["real", "synthetic", "synthetic_residual"], show=True, save=False,
                 plot_domain:Literal["data", "signal", "extended signal"]="signal"):
     print("Reading in data from various compilations for plotting purposes")
     z_p, mu_p, _ = read_data_pantheon()
@@ -80,8 +80,12 @@ def plot_charm2(posterior_samples, LH:_LhContainer, plot_mode:Literal["real", "s
                                          # additional_sample_labels=["Posterior line", "Posterior cfm"],
                                          )
     elif plot_mode == "synthetic":
-
         plot_synthetic_ground_truth(x=x, ground_truth=ZP.adjoint(LH.meta.ground_truth_field).val.asnumpy(),
+                                    x_max_pn=np.max(np.log(1 + z_p)),
+                                    reconstruction=(s_mean, s_std), save=save,
+                                    show=show)
+    elif plot_mode == "synthetic_residual":
+        plot_synthetic_residual(x=x, ground_truth=ZP.adjoint(LH.meta.ground_truth_field).val.asnumpy(),
                                     x_max_pn=np.max(np.log(1 + z_p)),
                                     reconstruction=(s_mean, s_std), save=save,
                                     show=show)

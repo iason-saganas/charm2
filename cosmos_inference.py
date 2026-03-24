@@ -1,24 +1,16 @@
 from charm2 import *
 import numpy as np
+import nifty.cl as ift
 
-# import sys
-# import traceback
-#
-# _old_write = sys.stdout.write
-#
-# def debug_write(text):
-#     if text.strip():  # ignore empty newlines
-#         print("\n--- STDOUT TRACE ---", file=sys.__stderr__)
-#         traceback.print_stack(limit=10, file=sys.__stderr__)
-#     return _old_write(text)
-#
-# sys.stdout.write = debug_write
+seed = 42
+ift.random.push_sseq_from_seed(seed)
+np.random.seed(seed)
 
-LH = cosmological_likelihood(data_to_use="DESY5", mode='non-parametric', init_fluctuations_parameter=0.1)
+LH = cosmological_likelihood(data_to_use="DESY5", mode='non-parametric', init_fluctuations_parameter=0.9)
 # LH = cosmological_likelihood(data_to_use="DESY5", mode='flat_LCDM')
 
-global_iterations = 100
-kl_rate = lambda itr: 30 if itr < 98 else 100
+global_iterations = 1
+kl_rate = 1
 
 
 inference_args = dict(likelihood_energy=LH.like,

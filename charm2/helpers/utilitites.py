@@ -67,7 +67,8 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'read_data_des', 'store_meta_data', 'get_datetime', 'read_data', 'plot_histogram',
            'plot_prior_cfm_samples', 'posterior_parameters', 'visualize_posterior_histograms',
            'construct_initial_position', 'evolving_dark_energy_fit', 'optimize_kl_and_store_metadata', '_LhContainer',
-           '_LhMetaContainer', 'FlatLCDM', 'FlatEDE', 'data_dir', 'signal_from_H0', 'DataArgs', 'GroundTruthArgs']
+           '_LhMetaContainer', 'FlatLCDM', 'FlatEDE', 'data_dir', 'signal_from_H0', 'DataArgs', 'GroundTruthArgs',
+           'plot_synthetic_residual']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -621,12 +622,15 @@ class CovarianceMatrix(MatrixProductOperator):
             raise ValueError("Can't get factor of Covariance matrix, `enable_transformation` is set to False.")
         A = self._mat.asnumpy()
         U, D, U_inv = spectral_decompose(A, tol=self.tol)
-        square_root = U @ np.sqrt(D) @ U_inv
-        sanity_check = np.allclose(A, square_root @ square_root, atol=self.tol, rtol=0)
+        # square_root = U @ np.sqrt(D) @ U_inv
+        # sanity_check = np.allclose(A, square_root @ square_root, atol=self.tol, rtol=0)
+        square_root = np.dot(U, np.dot(np.sqrt(D), U_inv))
+        sanity_check = np.allclose(A, np.dot(square_root, square_root), atol=self.tol, rtol=0)
         if not sanity_check:
             raise ValueError("A is not approximately equal to the square of its"
                              "square root decomposition.")
         return square_root
+
 
     def get_sqrt(self):
         if not self.enable_transformation:
@@ -636,12 +640,16 @@ class CovarianceMatrix(MatrixProductOperator):
         """
         return MatrixProductOperator(self._domain, self.mtrx_sqrt)
 
+
     def draw_sample(self, from_inverse=False):
         if from_inverse:
             raise NotImplementedError
         n_dp = self._mat.shape[0]
-        noise_vector = np.random.multivariate_normal(mean=np.zeros(n_dp), cov=self._mat, check_valid='warn')
         d_space = UnstructuredDomain(n_dp)
+
+        xi = np.random.standard_normal(n_dp)
+        noise_vector = np.dot(self.mtrx_sqrt, xi)
+        # noise_vector = np.random.multivariate_normal(mean=np.zeros(n_dp), cov=self._mat, check_valid='warn')  # old code
         return Field(domain=DomainTuple.make(d_space), val=noise_vector)
 
 
@@ -1423,6 +1431,28 @@ def plot_charm1_in_comparison_fields(show: bool = False, save: bool = True, disa
               save_filename=filename, show=show, loc="upper left", disable_legend=True)
 
 
+def plot_synthetic_residual(x: RGSpace, ground_truth: np.ndarray, reconstruction: np.ndarray, x_max_pn: float, show=True, save=False,
+                             custom_ax = None, further_samples = None,
+                                labels_further_samples = None,):
+    x = x.field().val.asnumpy()
+    s_mean, s_std = reconstruction
+    if custom_ax is None:
+        ax = plt.gca()
+    else:
+        ax = custom_ax
+
+    res = s_mean - ground_truth
+
+    agreeing = res[np.where((res < s_std) & (res > -s_std))]
+    how_many_inside_1_sigma = len(agreeing)/len(res) * 100
+
+    ax.fill_between(x=x, y1=-s_std, y2=+s_std, color=light_blue)
+    ax.plot(x, res, lw=1, color=blue, label="Residual of mean posterior and ground truth")
+
+    show_plot(x_label="xl", y_label="yl", title=fr"Inside of $1\sigma$: ~{np.round(how_many_inside_1_sigma,2)} $\%$",
+              save_filename="", show=show, loc="upper left", disable_legend=False)
+
+
 def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: float, show=True, save=False,
                                 reconstruction: tuple = None, custom_ax = None, further_samples = None,
                                 labels_further_samples = None,):
@@ -1453,8 +1483,6 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
         # filename = "data_storage/figures/pdf_versions_rest/PAPER_synthetic_uniform_data_b0_0_2"
     else:
         filename = ""
-
-
 
 
     if reconstruction is not None:
@@ -2403,6 +2431,10 @@ def construct_initial_position(n_pix_ext, distances, fluctuations, apply_prior_l
 @dataclass
 class DataArgs:
     """
+    noise_covariance
+        Determines the type of the noise operator. If None, a diagonal noise operator is assumed, which has a constant
+        value across red shift of 0.1 (mean of Union2.1 diagonal: ~ 0.07). Alternatively, pass the full covariance.
+        If given, overrides number of data points.
     n_dp
         The number of datapoints to generate.
     uniform_drawing
@@ -2412,6 +2444,7 @@ class DataArgs:
         If True, overrides `uniform_drawing` and the number of data points such that the synthetic data are distributed
         similarly to the DESY5 dataset.
     """
+    noise_covariance: Optional[np.ndarray] = None
     n_dp: int = 500
     uniform_drawing: bool = False
     use_des_like_data_distribution: bool = False
@@ -2441,14 +2474,15 @@ class GroundTruthArgs:
 class _LhMetaContainer:
     d: Field           # The data array
     neg_a_mag: np.ndarray   # array of -ln(a)
-    s_model: Any            # the nifty model
+    s_model: Any            # the nifty signal model
+    response: Any           # response function
     s_mdl_meta: list        # A list containing metadata on the signal model
     x: RGSpace          # the domain corresponding to neg_a_mag in signal space containing an additional field()
                             # property returning the signal domain values
     ZP: FieldZeroPadder # To extend the signal domain or to cut it with its adjoint
     init_pos: Any           # The initial latent position of the inference
     b0: np.float64          # The initial b0 parameter from which `init_pos` was calculated
-    noise_cov: CovarianceMatrix
+    noise_cov: np.ndarray
     dataset_name: str
     mode: str   # Either `non-parametric`, `flat_LCDM`, `flat_EDE` or `synth`
     ic_and_minimizers: tuple  # tuple of: (ic_sampling_lin, ic_sampling_nl, geoVI_sampling_minimizer, ic_newton, descent_finder)
@@ -2465,21 +2499,36 @@ class _LhContainer:
 
 
 def inspect_callback(out_name, LH_dataclass: _LhContainer, samples, global_iter):
-    LH = LH_dataclass
+
+    # Plot mean forward model in signal space
+    folder_name = out_name + "/fw_model/"
+    os.makedirs(folder_name, exist_ok=True)
+    _plot_fw_model_signal_space(LH=LH_dataclass, samples=samples, fn=folder_name + "mean_fw_model_iter_" + str(global_iter))
+
+    # Plot data with histogram
+    folder_name = out_name + "/diagnostics/"
+    os.makedirs(folder_name, exist_ok=True)
+    _plot_data(LH=LH_dataclass, samples=samples, fn=folder_name + "data_with_histogram")
+
+    # Plot forward model in data space
+    _plot_fw_model_data_space(LH=LH_dataclass, samples=samples, fn=folder_name + "fw_model_data_space")
+
+
+def _plot_fw_model_signal_space(LH:_LhContainer, samples, fn):
+
+    # Extract properties
     s_model = LH.meta.s_model
     cutter = LH.meta.ZP.adjoint
     x = LH.meta.x.field().val.asnumpy()
     mode = LH.meta.mode
 
-    folder_name = out_name + "/fw_model/"
-    os.makedirs(folder_name, exist_ok=True)
-    fn = folder_name + "mean_fw_model_iter_" + str(global_iter)
-
+    # Extract signal samples
     s_model_samples = [s_model(sl) for sl in samples.iterator()]
     s_model_samples = [cutter(sl).val.asnumpy() for sl in s_model_samples]
     mean_fw_model = np.mean(s_model_samples, axis=0)
     fw_model_std = np.std(s_model_samples, axis=0)
 
+    # Calculate the mean line if non-parametric charm2 model was used
     if mode == 'non-parametric':
         s_line = s_model.line_model
         line_model_domain = MultiDomain.make(
@@ -2489,7 +2538,7 @@ def inspect_callback(out_name, LH_dataclass: _LhContainer, samples, global_iter)
         for sl in samples.iterator():
             sample_values = sl.val
             line_model_relevant_part = {k: v for k, v in sample_values.items()
-                                         if k in ["line model slope", "line model y-intercept"]}
+                                        if k in ["line model slope", "line model y-intercept"]}
             dct = {
                 "line model slope": Field(scalar_dom, line_model_relevant_part["line model slope"]),
                 "line model y-intercept": Field(scalar_dom, line_model_relevant_part["line model y-intercept"]),
@@ -2522,7 +2571,76 @@ def inspect_callback(out_name, LH_dataclass: _LhContainer, samples, global_iter)
     plt.close()
 
 
-def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=False, **kwargs):
+def _plot_data(LH:_LhContainer, samples, fn):
+    d = LH.meta.d.val.asnumpy()
+    x = LH.meta.neg_a_mag
+
+    fig, axs = plt.subplots(2, 1, sharex=True)
+    ax1:plt.Axes = axs[0]
+    ax2:plt.Axes = axs[1]
+
+    ax1.hist(x=x, bins=10, facecolor="black")
+    ax1.set_ylabel(r"$\#$ dtps")
+
+    ax2.plot(x, d, lw=0, color="black")
+    ax2.set_xlabel(r"$x=-\mathrm{ln}(a)$")
+    ax2.set_ylabel(r"$\mu(x)$")
+
+    plt.tight_layout()
+    plt.savefig(fn)
+    plt.close()
+
+
+def _plot_fw_model_data_space(LH:_LhContainer, samples, fn):
+    d = LH.meta.d.val.asnumpy()
+    x = LH.meta.neg_a_mag
+    x_signal = LH.meta.x.field().val.asnumpy()
+
+    # Extract properties
+    R = LH.meta.response
+    N = LH.meta.noise_cov
+    mode = LH.meta.mode
+
+    # Extract signal samples
+    smpls = [R(sl).val.asnumpy() for sl in samples.iterator()]
+
+    N_inv = np.linalg.inv(N)
+    chi2_samples = [1/len(d) * (d-sl).T @ N_inv @ (d-sl) for sl in smpls]
+    mean_chi2 = np.mean(chi2_samples, axis=0)
+    std_chi2 = np.std(chi2_samples, axis=0)
+
+    mean_fw_model = np.mean(smpls, axis=0)
+    # fw_model_std = np.std(smpls, axis=0)
+
+    fig, axs = plt.subplots(2, 1, sharex=True)
+    ax1:plt.Axes = axs[0]
+    ax2:plt.Axes = axs[1]
+
+    ax1.plot(x, d, color="black", label="Data", lw=0)
+    ax2.plot(x, d-mean_fw_model, color="black", label="Residuals", lw=0)
+    ax1.plot(x, mean_fw_model, color=blue, label="mean fw model", lw=0)
+
+    ax1.set_ylabel(r"$\mu(x)$")
+    ax2.set_xlabel(r"$x=-\mathrm{ln}(a)$")
+    ax2.set_ylabel(r"$\Delta\mu(x)$")
+
+    ax1.set_title(
+        rf"$\chi^2_\mathrm{{red}} \approx {mean_chi2:.4f} \pm {std_chi2:.4f}$"
+    )
+
+    ax1.legend()
+    ax2.legend()
+
+    ax1.set_ylim(28, 45)
+
+    plt.tight_layout()
+    plt.savefig(fn)
+    plt.close()
+
+
+
+def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=False,
+                                   custom_folder_name="", custom_note="", **kwargs):
     """
     :param LH_dataclass: An instance of the `_LhContainer` container class (see `CONFIG_cosmological`)
     :param kwargs:  Keyword arguments passed to ift.optimize_kl(). Omit output_directory! Will be built from dataset
@@ -2532,7 +2650,9 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
     LH = LH_dataclass
     mode = LH.meta.mode
     model_mode = f"_{mode}" if mode != "" else mode
-    out_name = f'inferences/{LH.meta.b0}/{LH.meta.dataset_name}{model_mode}/'
+    if custom_folder_name != "":
+        custom_folder_name += "/"
+    out_name = f'inferences/{LH.meta.b0}/{custom_folder_name}{LH.meta.dataset_name}{model_mode}/'
     callback = partial(inspect_callback, out_name, LH)
 
     from time import time
@@ -2607,7 +2727,7 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
     if i_type == 'synthetic':
         data_gen_info = (
             f"\nData generation:\n"
-            f"  n_dp = {LH.meta.data_generation_args.n_dp}\n"
+            f"  n_dp = {LH.meta.data_generation_args.n_dp} (potentially overriden by `use_des_like_data_distribution` or given noise covariance to match its shape)\n"
             f"  uniform_drawing = {LH.meta.data_generation_args.uniform_drawing}\n"
             f"  use_des_like_data_distribution = {LH.meta.data_generation_args.use_des_like_data_distribution}\n"
         )
@@ -2622,6 +2742,9 @@ def optimize_kl_and_store_metadata(LH_dataclass: _LhContainer, calculate_elbo=Fa
         )
 
         note += data_gen_info + ground_gen_info
+
+    note += "\n"
+    note += custom_note
 
     new_store_meta_data(name=now, duration_of_inference=inference_duration, len_d=len(LH.meta.d.val.asnumpy()), expansion_rate=H0_estimate,
                         inference_type=i_type, signal_model_param=LH.meta.s_mdl_meta, other=note,

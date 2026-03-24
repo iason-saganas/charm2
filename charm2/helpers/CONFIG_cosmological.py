@@ -31,6 +31,8 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon+", "DESY5"
                                             parameter itself.
     :return:
     """
+    if mode != "non-parametric":
+        init_fluctuations_parameter = None  # override in case accidentally given
     z, mu, covariance = read_data(data_to_use)
 
     # print("Typical variance level: ", np.mean(np.diag(covariance)))
@@ -168,7 +170,7 @@ def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon+", "DESY5"
     ic_and_minimizers = (ic_sampling_lin, ic_sampling_nl, geoVI_sampling_minimizer, ic_newton, descent_finder)
 
 
-    LH_meta = _LhMetaContainer(d=d, neg_a_mag=neg_a_mag,s_model=s, s_mdl_meta=arguments,
+    LH_meta = _LhMetaContainer(d=d, neg_a_mag=neg_a_mag,s_model=s, response=R, s_mdl_meta=arguments,
                                x=x, ZP=X, init_pos=initial_pos, b0=init_fluctuations_parameter,
                                noise_cov=covariance, dataset_name=data_to_use, mode=mode,
                                ic_and_minimizers=ic_and_minimizers)
