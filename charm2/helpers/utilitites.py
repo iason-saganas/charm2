@@ -515,6 +515,70 @@ def read_data_des():
     return zCMB, mu_obs, cov_mat
 
 
+def read_data_des_dovekie():
+    """Updated data introduced in the paper by Popovic et al: https://arxiv.org/pdf/2511.07517
+    from this github link:
+
+    https://github.com/des-science/DES-SN5YR/tree/main/4_DISTANCES_COVMAT.
+
+    """
+    from astropy.table import Table
+    default_data_file = "charm2/raw_data/DES-Dovekie_HD_cleaned.csv"
+    default_covmat_file = "charm2/raw_data/DESY5_DOVEKIE_STAT+SYS.npz"
+
+    filename = default_data_file
+    print("Loading Dovekie SN data from {}".format(filename))
+
+    cols = ['CID','IDSURVEY','zHD','zHEL','MU','MUERR','MUERR_VPEC','MUERR_SYS','PROBIA_BEAMS']
+    data = Table.read(filename, format='ascii.csv')  # first row contains column names `cols`
+    # => skip and fix column names directly
+    origlen = len(data)
+
+    # The only columns that we actually need here are the redshift,
+    # distance modulus and distance modulus error
+    ww = (data['zHD'] > 0.00)
+
+    # use the vpec corrected redshift for zCMB
+    zCMB = data['zHD'][ww]
+    zHEL = data['zHEL'][ww]
+
+    # distance modulus and relative stat uncertainties. Note MUERR instead or MUERR_FINAL
+    mu_obs = data['MU'][ww]
+    mu_obs_err = data['MUERR'][ww]
+
+    # Return this to the parent class, which will use it
+    # when working out the likelihood
+    print(f"Found {len(zCMB)} Dovekie 5 supernovae (or bins if you used the binned data file)")
+
+    filename = default_covmat_file
+    print("Loading Dovekie SN covariance from {}".format(filename))
+
+    # The file format for the covariance has been changed in the new SNANA version in use after DES
+    # Covtot_inv is the inverse of stat+sys because it makes no sense to invert covsys
+    # This data file is stored with .npz (which will work with np.load)
+    # in upper triangular format
+    # changes are made to accomodate anticipated much larger files from LSST
+    d = np.load(filename)
+    n = d[d.files[0]][0]
+    inv_cov = np.zeros((n, n))
+    inv_cov[np.triu_indices(n)] = d[d.files[1]]
+
+    # Reflect to lower triangular part to make it symmetric
+    i_lower = np.tril_indices(n, -1)
+    inv_cov[i_lower] = inv_cov.T[i_lower]
+    # Unfortunately, to make this work in cosmosis we need to invert the inverse covariance and return that ... sigh ...
+    C = np.linalg.inv(inv_cov)
+
+    # Return the covariance; the parent class knows to invert this
+    # later to get the precision matrix that we need for the likelihood.
+    C = C[ww][:, ww]
+
+    print("\tAssymmetry measure:", asymmetry_measure(C))
+    print("\tFinished")
+
+    return zCMB, mu_obs, C
+
+
 def read_data(data_to_use):
     if data_to_use == "Union2.1":
         return read_data_union()
@@ -522,6 +586,8 @@ def read_data(data_to_use):
         return read_data_pantheon()
     elif data_to_use == "DESY5":
         return read_data_des()
+    elif data_to_use == "DESY5_dovekie":
+        return read_data_des_dovekie()
     else:
         raise ValueError(f"Can't read unknown data <{data_to_use}>")
 

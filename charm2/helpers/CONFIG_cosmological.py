@@ -22,7 +22,7 @@ __all__ = ["cosmological_likelihood", "ic_sampling_lin", "ic_sampling_nl", "geoV
 from .custom_correlated_field import CustomSimpleCorrelatedField
 
 
-def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon+", "DESY5"],
+def cosmological_likelihood(data_to_use:Literal["Union2.1", "Pantheon+", "DESY5", "DESY5_dovekie"],
                             mode:Literal["non-parametric", "flat_LCDM", "flat_EDE"], init_fluctuations_parameter=None):
     """
 
