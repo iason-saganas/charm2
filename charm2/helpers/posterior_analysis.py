@@ -35,7 +35,19 @@ def _plot_data_domain():
 
 
 def plot_charm2(posterior_samples, LH:_LhContainer, plot_mode:Literal["real", "synthetic", "synthetic_residual"], show=True, save=False,
-                plot_domain:Literal["data", "signal", "extended signal"]="signal"):
+                plot_domain:Literal["data", "signal", "extended signal"]="signal", **kwargs):
+    """
+
+    :param posterior_samples:
+    :param LH:
+    :param plot_mode:
+    :param show:
+    :param save:
+    :param plot_domain:         Whether to plot in data or signal domain or the extended signal domain (for periodic
+                                boundary conditions).
+    :param kwargs:              Passed to `plot_charm2_in_comparison_fields` or `plot_synthetic_ground_truth`
+    :return:
+    """
     print("Reading in data from various compilations for plotting purposes")
     z_p, mu_p, _ = read_data_pantheon()
     z_u, mu_u, _ = read_data_union()
@@ -66,6 +78,7 @@ def plot_charm2(posterior_samples, LH:_LhContainer, plot_mode:Literal["real", "s
                                          s=s_mean, s_err=s_std, dataset_used=LH.meta.dataset_name,
                                          neg_a_mag=neg_a_mag, b0=LH.meta.b0, apply_common_labels=True, disable_hist=True,
                                          disable_x_label=False, disable_y_label=False, plot_evolving_dark_energy=False,
+                                         **kwargs
                                          # additional_sample_labels="Pantheon 0.2=b0",
                                          # additional_samples=[s_mean_2.val,]
                                          # additional_samples=[
@@ -80,14 +93,15 @@ def plot_charm2(posterior_samples, LH:_LhContainer, plot_mode:Literal["real", "s
                                          # additional_sample_labels=["Posterior line", "Posterior cfm"],
                                          )
     elif plot_mode == "synthetic":
+        init_field = LH.meta.ZP.adjoint(LH.meta.s_model(LH.meta.init_pos))
         plot_synthetic_ground_truth(x=x, ground_truth=ZP.adjoint(LH.meta.ground_truth_field).val.asnumpy(),
-                                    x_max_pn=np.max(np.log(1 + z_p)),
-                                    reconstruction=(s_mean, s_std), save=save,
-                                    show=show)
+                                    reconstruction=(s_mean, s_std), save=save, x_max_pn=np.max(np.log(1 + z_p)),
+                                    further_samples=[init_field], labels_further_samples=['Initial field'],
+                                    show=show, **kwargs)
     elif plot_mode == "synthetic_residual":
         plot_synthetic_residual(x=x, ground_truth=ZP.adjoint(LH.meta.ground_truth_field).val.asnumpy(),
                                     x_max_pn=np.max(np.log(1 + z_p)),
                                     reconstruction=(s_mean, s_std), save=save,
                                     show=show)
     else:
-        raise ValueError("plot_mode must be 'real' or 'synthetic'")
+        raise ValueError("plot_mode must be 'real' or 'synthetic' or 'synthetic_residual'")

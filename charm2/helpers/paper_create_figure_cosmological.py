@@ -1,61 +1,29 @@
 # Run from root directory as: `python3.12 -m scripts.analyze_stored_data_create_central_results_2`
 from scipy.constants import G
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from datetime import datetime
+import os
+from nifty.cl.minimization.sample_list import SampleList
+from charm2 import *
+import nifty.cl as ift
+import re
 
-from .utilitites import special_legend_III
-
-cosmological = True
-extend = False
-data_to_analyze = "Union2.1"
-plot_in_signal_space = True
-plot_in_data_space = False
-if cosmological:
-    from .CONFIG_cosmological import *
-    likelihood, d, neg_a_mag, arguments, x, X, s, init_pos, cov = cosmological_likelihood(data_to_use=data_to_analyze)
-    data_space = d.domain
-else:
-    from .CONFIG_synthetic import *
-    raise ValueError("not implemented yet")
+# cosmological = True
+# extend = False
+# data_to_analyze = "Union2.1"
+# plot_in_signal_space = True
+# plot_in_data_space = False
+# if cosmological:
+#     from .CONFIG_cosmological import *
+#     likelihood, d, neg_a_mag, arguments, x, X, s, init_pos, cov = cosmological_likelihood(data_to_use=data_to_analyze)
+#     data_space = d.domain
+# else:
+# from .CONFIG_synthetic import *
+# raise ValueError("not implemented yet")
 
 # fluct_range = np.arange(0.1, 1, 0.1)
 # fluct_range = np.linspace(.05, 0.3, 5)  # for DESY5 low fluctuations experiment
-fluct_range = [0.05]
-
-corresponding_pickles = [
-    # "des.pickle"  # for fluct_init = 0.6
-    # "pantheon_overfitting_1.pickle",
-    # "pantheon_overfitting_3.pickle",
-    # "PAPER_b0_0_6_pantheon.pickle"
-    "not in list"
-]
-
-# corresponding_pickles = ["2025-05-25_13-34-37_init_fluct_is_0.05.pickle",
-# "2025-05-25_15-25-35_init_fluct_is_0.1125.pickle",
-# "2025-05-25_17-17-51_init_fluct_is_0.175.pickle",
-# "2025-05-25_19-10-09_init_fluct_is_0.2375.pickle",
-# "2025-05-25_21-00-17_init_fluct_is_0.3.pickle"
-# ]
-
-def flat_lcdm(x: np.array, H_0, omega_m):
-
-    # Construct the base lcdm, cmb parameters signal field
-    m = 3 / (8 * np.pi * G)
-    inner_log_func = m * H_0 ** 2 * (1 + omega_m * (np.exp(3 * x) - 1))
-    s_base = np.log(inner_log_func)
-
-    return s_base
-
-
-def flat_evolving_dark_energy(x: np.array, H_0=68.37, w_a=-8.8, w_0=-0.36, omega_m0=0.495):
-
-    omega_l0 = 1 - omega_m0
-    m = 3 / (8 * np.pi * G)
-    E_sq = omega_m0*np.exp(3*x) + omega_l0 * np.exp(3*x*(1+w_0+w_a)) * np.exp( -3*(w_a*(1-np.exp(-x))))
-    inner_log_func = m * H_0 ** 2 * E_sq
-    s_base = np.log(inner_log_func)
-
-    return s_base
+# fluct_range = [0.05]
 
 
 def linear(x, m, t):
@@ -64,18 +32,20 @@ def linear(x, m, t):
 
 def get_mean_and_sqrt(pickled_samples, s_model, X_operator):
     s_mean, s_var = pickled_samples.sample_stat(s_model)
-    s_err = np.sqrt(X_operator.adjoint(s_var).val)
+    s_err = np.sqrt(X_operator.adjoint(s_var).val.asnumpy())
     s_mean = X_operator.adjoint(s_mean)
     return s_mean, s_err
 
 
-
-z_p, mu_p, _ = read_data_pantheon()
-z_u, mu_u, _ = read_data_union()
-z_d, mu_d, _ = read_data_des()
 def run_plot(ax, data_to_analyze, samples, b0, total_figure_height=8, **kwargs):
     # get likelihood & s_model
-    likelihood, d, neg_a_mag, arguments, x, X, s, init_pos, cov = cosmological_likelihood(data_to_use=data_to_analyze)
+    LH = cosmological_likelihood(data_to_use=data_to_analyze, mode="non-parametric", init_fluctuations_parameter=b0)
+    properties_old_versions = (
+    LH.like, LH.meta.d, LH.meta.neg_a_mag, LH.meta.s_mdl_meta, LH.meta.x, LH.meta.ZP, LH.meta.s_model, LH.meta.init_pos,
+    LH.meta.noise_cov, LH.meta.dataset_name)
+
+    likelihood_energy, d, neg_a_mag, arguments, x, X, s, initial_pos, covariance, data_to_use = properties_old_versions
+
     data_space = d.domain
 
     # compute mean + error using s_model
@@ -86,8 +56,8 @@ def run_plot(ax, data_to_analyze, samples, b0, total_figure_height=8, **kwargs):
         x_max_union=np.max(np.log(1 + z_u)),
         x_max_des=np.max(np.log(1 + z_d)),
         show=False, save=False,
-        x=x.field().val,
-        s=s_mean.val,
+        x=x.field().val.asnumpy(),
+        s=s_mean.val.asnumpy(),
         s_err=s_err,
         dataset_used=data_to_analyze,
         neg_a_mag=neg_a_mag,
@@ -111,17 +81,111 @@ def plot_hist(axis, neg_a_mag, x_max, set_ylabel=True, total_figure_height=8):
     axis.set_xlim(0, x_max)
 
 
-samples_union_b0_0_6 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_6_union.pickle", absolute_path=True)
-samples_union_b0_0_2 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_2_union.pickle", absolute_path=True)
+z_p, mu_p, _ = read_data('Pantheon+')
+z_u, mu_u, _ = read_data('Union2.1')
+z_d, mu_d, _ = read_data('DESY5')
 
-samples_pantheon_b0_0_6 = unpickle_me_this(
-    "/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_6_pantheon.pickle", absolute_path=True)
-samples_pantheon_b0_0_2 = unpickle_me_this(
-    "/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_2_pantheon.pickle", absolute_path=True)
+# Assumes inference data are stored in folder `inferences` in the same path as the `charm2` package and that data exists
+# Otherwise, please run `cosmo_inference.py` for different b0 initial parameters
+directory = Path(Path(__file__).parent.parent.parent, 'inferences/')
 
-samples_desy5_b0_0_2 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_2_desy5.pickle", absolute_path=True)
-samples_desy5_b0_0_6 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_6_desy5.pickle", absolute_path=True)
-samples_desy5_b0_0_05 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_05_desy5.pickle", absolute_path=True)
+
+PATHS_TO_SAMPLES = dict(
+    union=[
+        Path(directory, "0.2/Union2.1_non-parametric/"),
+        Path(directory, "0.6/Union2.1_non-parametric/")
+    ],
+    pantheon=[
+        Path(directory, "0.2/Pantheon+_non-parametric/"),
+        Path(directory, "0.6/Pantheon+_non-parametric/")
+    ],
+    desy5_vincenzi=[
+        Path(directory, "0.05/DESY5_non-parametric/"),
+        Path(directory, "0.2/DESY5_non-parametric/"),
+        Path(directory, "0.6/DESY5_non-parametric/"),
+    ],
+    desy5_dovekie=[
+        Path(directory, "0.05/DESY5_dovekie_non-parametric/"),
+        Path(directory, "0.2/DESY5_dovekie_non-parametric/"),
+        Path(directory, "0.6/DESY5_dovekie_non-parametric/"),
+    ]
+)
+
+
+def _parse_folder_name(folder_path: str):
+    folder = Path(folder_path)
+    folder_parts = folder.parts
+
+    # Extract b0: assume it's the first numeric part in the path
+    b0 = None
+    for part in folder_parts:
+        try:
+            val = float(part)
+            b0 = val
+            break
+        except ValueError:
+            continue
+    if b0 is None:
+        raise ValueError(f"Could not find b0 in path {folder_path}")
+
+    # Extract dataset name: must be one of the known datasets
+    known_datasets = ["Union2.1", "Pantheon+", "DESY5", "DESY5_dovekie"]
+    dataset_name = None
+    for part in folder_parts:
+        for ds in known_datasets:
+            if ds in part:
+                dataset_name = ds
+                break
+        if dataset_name is not None:
+            break
+    if dataset_name is None:
+        raise ValueError(f"Could not find dataset name in path {folder_path}")
+
+    return dataset_name, b0
+
+
+def get_samples(folder_name):
+    dataset_name, b0 = _parse_folder_name(folder_name)
+    LH = cosmological_likelihood(dataset_name, mode="non-parametric", init_fluctuations_parameter=b0)
+    inference_args = dict(likelihood_energy=LH.like,
+                          total_iterations=1,
+                          n_samples=1,
+                          kl_minimizer=descent_finder,
+                          sampling_iteration_controller=ic_sampling_lin,
+                          nonlinear_sampling_minimizer=geoVI_sampling_minimizer,
+                          return_final_position=False,
+                          resume=True,
+                          initial_position=None,
+                          plot_energy_history=True
+                          )
+    posterior_samples = ift.optimize_kl(output_directory=folder_name, **inference_args)
+    return LH, posterior_samples
+
+
+gs = lambda x: get_samples(x)[1]
+
+samples_union_b0_0_2, samples_union_b0_0_6 = (gs(p) for p in PATHS_TO_SAMPLES['union'])
+samples_pantheon_b0_0_2, samples_pantheon_b0_0_6 = (gs(p) for p in PATHS_TO_SAMPLES['pantheon'])
+samples_desy5_b0_0_05, samples_desy5_b0_0_2, samples_desy5_b0_0_6 = (gs(p) for p in PATHS_TO_SAMPLES['desy5_vincenzi'])
+samples_desy5_DOV_b0_0_05, samples_desy5_DOV_b0_0_2, samples_desy5_DOV_b0_0_6 = (gs(p) for p in PATHS_TO_SAMPLES['desy5_dovekie'])
+
+neg_a_mag_union = cosmological_likelihood("Union2.1", mode="non-parametric", init_fluctuations_parameter=0.2).meta.neg_a_mag
+neg_a_mag_pantheon = cosmological_likelihood("Pantheon+", mode="non-parametric", init_fluctuations_parameter=0.2).meta.neg_a_mag
+neg_a_mag_desy5 = cosmological_likelihood("DESY5", mode="non-parametric", init_fluctuations_parameter=0.2).meta.neg_a_mag
+
+neg_a_mags_list = [neg_a_mag_union, neg_a_mag_desy5, neg_a_mag_pantheon]
+x_max=1.2
+
+# OLD; don't delete for legacy reasons
+# samples_union_b0_0_2 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_2_union.pickle", absolute_path=True)
+# samples_union_b0_0_6 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_6_union.pickle", absolute_path=True)
+# samples_pantheon_b0_0_6 = unpickle_me_this(
+#     "/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_6_pantheon.pickle", absolute_path=True)
+# samples_pantheon_b0_0_2 = unpickle_me_this(
+#     "/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_2_pantheon.pickle", absolute_path=True)
+# samples_desy5_b0_0_2 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_2_desy5.pickle", absolute_path=True)
+# samples_desy5_b0_0_6 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_6_desy5.pickle", absolute_path=True)
+# samples_desy5_b0_0_05 = unpickle_me_this("/data_storage/PAPER_fluct_is_not_constrained/real/PAPER_b0_0_05_desy5.pickle", absolute_path=True)
 
 plots = [
     ("Union2.1", samples_union_b0_0_6, 0.6),
@@ -133,14 +197,6 @@ plots = [
     ("Charm1", None, None),
     ("DESY5", samples_desy5_b0_0_05, 0.05),
 ]
-
-_, _, neg_a_mag_union, _, _, _, _, _, _ = cosmological_likelihood(data_to_use="Union2.1")
-_, _, neg_a_mag_pantheon, _, _, _, _, _, _ = cosmological_likelihood(data_to_use="Pantheon+")
-_, _, neg_a_mag_desy5, _, _, _, _, _, _ = cosmological_likelihood(data_to_use="DESY5")
-
-
-neg_a_mags_list = [neg_a_mag_union, neg_a_mag_desy5, neg_a_mag_pantheon]
-x_max=1.2
 
 """
 Example plots: Singular histograms and reconstruction plots
@@ -280,6 +336,7 @@ Show plot
 global_fac = 2.1
 width_fac = 1.25
 fig.set_size_inches(12*global_fac*width_fac, 8*global_fac)   # shrink the whole thing
-plt.savefig("PAPER_final_reconstructions.pdf", format="pdf", bbox_inches='tight')
+now = datetime.now()
+plt.savefig(f"PAPER_final_reconstructions_{now}.pdf", format="pdf", bbox_inches='tight')
 # plt.show()
 

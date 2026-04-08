@@ -83,7 +83,10 @@ def synthetic_likelihood(init_fluctuations_parameter, data_generation_args:DataA
 
         initial_pos = construct_initial_position(n_pix_ext=int(n_pix * x_fac), distances=pxl_size,
                                                  fluctuations=init_fluctuations_parameter,
-                                                 apply_prior_xi_s=True)  # `apply_prior_xi_s=True` <-> draws random init pos
+                                                 apply_prior_xi_s=True,  # `apply_prior_xi_s=True` <-> draws random xs init pos
+                                                 apply_prior_line_offset=True,
+                                                 apply_prior_line_slope=True
+                                                 )
         args_cfm = {
             'offset_mean': 0,
             'offset_std': None,
@@ -136,7 +139,8 @@ def synthetic_likelihood(init_fluctuations_parameter, data_generation_args:DataA
     # The ground truth model
     if ground_truth_args.mode == "flat_LCDM":
         Ωm0 = ground_truth_args.Ωm0
-        offset = signal_from_H0(Ωm0)
+        H0 = ground_truth_args.H0
+        offset = signal_from_H0(H0)
         s_g = PiecewiseLinear(signal_space=x_ext, omega_m_custom=Ωm0, omega_l_custom=1-Ωm0, high_curv=False,
                               offset_custom=offset)
     elif ground_truth_args.mode == "flat_EDE":
@@ -176,7 +180,7 @@ def synthetic_likelihood(init_fluctuations_parameter, data_generation_args:DataA
     # Noise operator
     if cov is None:
         N = ift.ScalingOperator(domain=(data_space, ), factor=noise_level, sampling_dtype=np.float64)
-        cov = noise_level * np.ones((n_dp, n_dp), dtype=np.float64)
+        cov = np.diag(noise_level * np.ones((n_dp,), dtype=np.float64))
     else:
         N = CovarianceMatrix(domain=data_space, matrix=cov, sampling_dtype=np.float64, tol=1e-4,
                              enable_transformation=True)
@@ -188,6 +192,23 @@ def synthetic_likelihood(init_fluctuations_parameter, data_generation_args:DataA
     ground_truth_field = s_g(ground_truth_model)
     # Construct synthetic data
     d = R_g(ground_truth_model) + N.draw_sample()
+
+    if dga.custom_data_shift is not None:
+        if dga.apply_shift_where is None:
+            raise ValueError("dga.apply_shift_where is not defined")
+        else:
+            direction = dga.apply_shift_where[0]
+            if direction != "<" and direction != ">":
+                raise ValueError("The first element of dga.apply_shift_where needs to be '<' or '>'")
+            x0 = dga.apply_shift_where[1]
+            if direction == "<":
+                indcs_to_shift = np.where(neg_a_mag < x0)
+            else:
+                indcs_to_shift = np.where(neg_a_mag > x0)
+            bump_vals = np.zeros_like(d.val)
+            bump_vals[indcs_to_shift] = x0
+            d = d + ift.Field.from_raw(d.domain, arr=bump_vals)
+
 
     # DO NOT DELETE
     # If wished, add a systematic increase / decrease of SN mags at high redshift

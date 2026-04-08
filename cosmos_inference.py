@@ -6,7 +6,7 @@ seed = 42
 ift.random.push_sseq_from_seed(seed)
 np.random.seed(seed)
 
-LH = cosmological_likelihood(data_to_use="DESY5_dovekie", mode='non-parametric', init_fluctuations_parameter=0.2)
+LH = cosmological_likelihood(data_to_use="Union2.1", mode='non-parametric', init_fluctuations_parameter=0.6)
 # LH = cosmological_likelihood(data_to_use="DESY5", mode='flat_LCDM')
 
 global_iterations = 100
@@ -26,6 +26,6 @@ inference_args = dict(likelihood_energy=LH.like,
                             )
 
 
-posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=True, **inference_args)
+posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=False, **inference_args)
 
 plot_charm2(posterior_samples, LH, plot_domain="signal", plot_mode="real")

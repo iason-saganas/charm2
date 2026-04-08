@@ -20,7 +20,7 @@ from nifty.cl import LikelihoodEnergyOperator, MultiDomain, MultiField, Standard
     estimate_evidence_lower_bound, AnyArray
 from nifty.cl.domain_tuple import DomainTuple
 from nifty.cl.field import Field
-from typing import Tuple, Any, Optional, Literal
+from typing import Tuple, Any, Optional, Literal, Callable
 from nifty.cl.operators.diagonal_operator import DiagonalOperator
 from nifty.cl.operators.adder import Adder
 from nifty.cl.library.los_response import LOSResponse
@@ -68,7 +68,7 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'plot_prior_cfm_samples', 'posterior_parameters', 'visualize_posterior_histograms',
            'construct_initial_position', 'evolving_dark_energy_fit', 'optimize_kl_and_store_metadata', '_LhContainer',
            '_LhMetaContainer', 'FlatLCDM', 'FlatEDE', 'data_dir', 'signal_from_H0', 'DataArgs', 'GroundTruthArgs',
-           'plot_synthetic_residual']
+           'plot_synthetic_residual', 'special_legend_III', 'build_flat_lcdm_func', 'build_flat_evolving_dark_energy']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -523,8 +523,10 @@ def read_data_des_dovekie():
 
     """
     from astropy.table import Table
-    default_data_file = "charm2/raw_data/DES-Dovekie_HD_cleaned.csv"
-    default_covmat_file = "charm2/raw_data/DESY5_DOVEKIE_STAT+SYS.npz"
+
+    parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    default_data_file = f"{parent_path}/raw_data/DES-Dovekie_HD_cleaned.csv"
+    default_covmat_file = f"{parent_path}/raw_data/DESY5_DOVEKIE_STAT+SYS.npz"
 
     filename = default_data_file
     print("Loading Dovekie SN data from {}".format(filename))
@@ -735,23 +737,23 @@ def build_charm1_agnostic(mode="union2.1"):
     :param mode: str,       One of 'union2.1' or 'pantheon+'.
     """
     if mode == "union2.1":
-        path_to_x = "data_storage/raw_data/x_field_charm1_union2_1.txt"
-        path_to_s = "data_storage/raw_data/s_field_charm1_union2_1.txt"
-        path_to_D = r"data_storage/raw_data/D_field_charm1_union2_1.txt"
+        path_to_x = "../raw_data/x_field_charm1_union2_1.txt"
+        path_to_s = "../raw_data/s_field_charm1_union2_1.txt"
+        path_to_D = r"../raw_data/D_field_charm1_union2_1.txt"
         correction_offset = 0.0246747  # log(rho/rho0) in charm1 is not precisely at 0, which must be incorrect
     elif mode == "pantheon+":
-        path_to_x = "data_storage/raw_data/x_field_charm1_pantheon+.txt"
-        path_to_s = "data_storage/raw_data/s_field_charm1_pantheon+.txt"
-        path_to_D = r"data_storage/raw_data/D_field_charm1_pantheon+.txt"
+        path_to_x = "../raw_data/x_field_charm1_pantheon+.txt"
+        path_to_s = "../raw_data/s_field_charm1_pantheon+.txt"
+        path_to_D = r"../raw_data/D_field_charm1_pantheon+.txt"
         correction_offset = 0.10272  # log(rho/rho0) in charm1 is not precisely at 0, which must be incorrect
     elif mode == "pantheon+_reformulated":
-        path_to_x = "data_storage/raw_data/charm1_reformulated/x_field_charm1_pantheon+.txt"
-        path_to_s = "data_storage/raw_data/charm1_reformulated/s_field_charm1_pantheon+.txt"
-        path_to_D = r"data_storage/raw_data/charm1_reformulated/D_field_charm1_pantheon+.txt"
+        path_to_x = "../raw_data/charm1_reformulated/x_field_charm1_pantheon+.txt"
+        path_to_s = "../raw_data/charm1_reformulated/s_field_charm1_pantheon+.txt"
+        path_to_D = r"../raw_data/charm1_reformulated/D_field_charm1_pantheon+.txt"
     elif mode == "des_reformulated":
-        path_to_x = "data_storage/raw_data/charm1_reformulated/x_field_charm1_des.txt"
-        path_to_s = "data_storage/raw_data/charm1_reformulated/s_field_charm1_des.txt"
-        path_to_D = r"data_storage/raw_data/charm1_reformulated/D_field_charm1_des.txt"
+        path_to_x = "../raw_data/charm1_reformulated/x_field_charm1_des.txt"
+        path_to_s = "../raw_data/charm1_reformulated/s_field_charm1_des.txt"
+        path_to_D = r"../raw_data/charm1_reformulated/D_field_charm1_des.txt"
     else:
         raise ValueError("Unrecognized mode in `build_charm1_agnostic`.")
 
@@ -1521,7 +1523,7 @@ def plot_synthetic_residual(x: RGSpace, ground_truth: np.ndarray, reconstruction
 
 def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: float, show=True, save=False,
                                 reconstruction: tuple = None, custom_ax = None, further_samples = None,
-                                labels_further_samples = None,):
+                                labels_further_samples = None, show_comparison_fields=False):
     """
     Plots the synthetic ground truth in signal space.
     :param reconstruction:      A tuple containing (reconstruction_mean, reconstruction_std)
@@ -1533,7 +1535,8 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
     :return:
     """
 
-    # plot_comparison_fields(plot_fluctuations_scale_visualization=False, ax_object=custom_ax)
+    if show_comparison_fields:
+        plot_comparison_fields(plot_fluctuations_scale_visualization=False, ax_object=custom_ax)
 
     x = x.field().val.asnumpy()
     if custom_ax is None:
@@ -1611,9 +1614,10 @@ def plot_synthetic_ground_truth(x: RGSpace, ground_truth: np.ndarray, x_max_pn: 
     # special_legend_IV()
     special_legend_I()
 
+    # Revert to: (0, 1.25) and ylim (29.5, 33.5) for new figure limits in paper
     # Revert to: (0, 1.25) and ylim (29.5, 36) for figure limits in paper
     # Revert to: (0, 1.25) and ylim (29.5, 33) for figure limits in paper of DESY5 histogram mock reconstruction (last figure)
-    show_plot(x_lim=(0, 1.25), y_lim=(29.5, 36), x_label=xl, y_label=yl, title="",
+    show_plot(x_lim=(0, 1.25), y_lim=(29, 34), x_label=xl, y_label=yl, title="",
               save_filename=filename, show=show, loc="upper left", disable_legend=True)
 
 
@@ -2509,11 +2513,22 @@ class DataArgs:
     use_des_like_data_distribution
         If True, overrides `uniform_drawing` and the number of data points such that the synthetic data are distributed
         similarly to the DESY5 dataset.
+    custom_data_shift
+        If not None, introduce a systematic offset in the data of this magnitude.
+    apply_shift_where:
+        Required if `custom_data_shift` not None. A tuple of two strings:
+            If shift is to be applied on all data points for which x < x0, pass
+                apply_shift_where = ("<", x0)
+            If to be applied on all data points for which x > x0, pass
+                apply_shift_where = (">", x0)
+        x0 is then also written to the metadata file.
     """
     noise_covariance: Optional[np.ndarray] = None
     n_dp: int = 500
     uniform_drawing: bool = False
     use_des_like_data_distribution: bool = False
+    custom_data_shift: np.float64 = None
+    apply_shift_where: tuple = None
 
 
 @dataclass
@@ -2623,7 +2638,16 @@ def _plot_fw_model_signal_space(LH:_LhContainer, samples, fn):
     plt.plot(x, mean_fw_model, label="mean fw", color=blue, lw=2)
     if LH.meta.dataset_name == 'synthetic':
         ground_truth_field = LH.meta.ground_truth_field
-        plt.plot(x, cutter(ground_truth_field).val.asnumpy(), label="ground truth field", linestyle='-', color="black")
+        gt = cutter(ground_truth_field).val.asnumpy()
+        # Display how much the mean reconstruction deviates from the ground truth in the title
+
+        res = mean_fw_model - gt
+        outside = np.where((res >  fw_model_std) | (res < -fw_model_std))
+        N = len(res)
+        percent_outside_of_1sig = np.round(len(outside[0]) / N * 100, 2)
+
+        plt.plot(x, gt, label="ground truth field", linestyle='-', color="black")
+        plt.title(fr"Outside of one sigma: {percent_outside_of_1sig}$\%$")
     else:
         plot_comparison_fields()
         plt.xlim(0, 1.2)
@@ -2697,7 +2721,14 @@ def _plot_fw_model_data_space(LH:_LhContainer, samples, fn):
     ax1.legend()
     ax2.legend()
 
-    ax1.set_ylim(28, 45)
+    is_synthetic = (LH.meta.data_generation_args is not None)
+
+    if is_synthetic:
+        if LH.meta.data_generation_args.use_des_like_data_distribution:
+        # Assuming (!) that in this coise also the noise des covariance was passed, in which case we should
+        # set y limits on the plots. Des artificially blows up covariances they deem to unlikely to be SN afaik,
+        # leading to generated data that spans a large y range due to artifically high noise
+            ax1.set_ylim(28, 45)
 
     plt.tight_layout()
     plt.savefig(fn)
