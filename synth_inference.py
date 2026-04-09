@@ -37,4 +37,7 @@ inference_args = dict(likelihood_energy=LH.like,
 
 posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=False, custom_folder_name="test", **inference_args)
 
-plot_charm2(posterior_samples, LH, plot_domain="signal", plot_mode='synthetic', **dict(show_comparison_fields=True))
+init_field = LH.meta.ZP.adjoint(LH.meta.s_model(LH.meta.init_pos))
+plot_charm2(posterior_samples, LH, plot_domain="signal", plot_mode='synthetic', **dict(show_comparison_fields=True,
+                                                                                       further_samples=[init_field],
+                                                                                       labels_further_samples=['Initial field']))

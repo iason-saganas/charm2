@@ -93,10 +93,8 @@ def plot_charm2(posterior_samples, LH:_LhContainer, plot_mode:Literal["real", "s
                                          # additional_sample_labels=["Posterior line", "Posterior cfm"],
                                          )
     elif plot_mode == "synthetic":
-        init_field = LH.meta.ZP.adjoint(LH.meta.s_model(LH.meta.init_pos))
         plot_synthetic_ground_truth(x=x, ground_truth=ZP.adjoint(LH.meta.ground_truth_field).val.asnumpy(),
                                     reconstruction=(s_mean, s_std), save=save, x_max_pn=np.max(np.log(1 + z_p)),
-                                    further_samples=[init_field], labels_further_samples=['Initial field'],
                                     show=show, **kwargs)
     elif plot_mode == "synthetic_residual":
         plot_synthetic_residual(x=x, ground_truth=ZP.adjoint(LH.meta.ground_truth_field).val.asnumpy(),
