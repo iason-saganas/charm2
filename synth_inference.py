@@ -6,21 +6,20 @@ seed = 42
 ift.random.push_sseq_from_seed(seed)
 np.random.seed(seed)
 
-b0=0.2
-# data_args = DataArgs(use_des_like_data_distribution=False, noise_covariance=None, uniform_drawing=False)
-data_args = DataArgs(use_des_like_data_distribution=True, noise_covariance=None, uniform_drawing=False,
-                     custom_data_shift=0.1, apply_shift_where=("<", 0.6))
 
-# ground_truth_args = GroundTruthArgs(mode="flat_LCDM", H0=100, Ωm0=0.3,)  # synthetic reconstructions from sect. 4.2
-ground_truth_args = GroundTruthArgs(mode="flat_LCDM", H0=70.3, Ωm0=0.3,)  #  for bump experiment
+_, _, des_cov = read_data_des()
+alpha = 0.1
+b0 = 0.6
+
+data_args = DataArgs(use_des_like_data_distribution=True, noise_covariance=alpha * des_cov, uniform_drawing=False)
+ground_truth_args = GroundTruthArgs(mode="flat_EDE", H0=70, Ωm0=0.495, w0=-0.36, wa=-8.8)  #  for bump experiment
+
 
 LH = synthetic_likelihood(init_fluctuations_parameter=b0, mode='non-parametric',
                           ground_truth_args=ground_truth_args, data_generation_args=data_args,)
 
 global_iterations = 1
-# global_iterations = 50
-kl_rate = lambda itr: 1
-# kl_rate = lambda itr: 25 if itr < 45 else 50
+kl_rate = 1
 
 inference_args = dict(likelihood_energy=LH.like,
                         total_iterations=global_iterations,
@@ -35,9 +34,8 @@ inference_args = dict(likelihood_energy=LH.like,
                             )
 
 
-posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=False, custom_folder_name="test", **inference_args)
+posterior_samples = optimize_kl_and_store_metadata(LH, calculate_elbo=False,
+                                                   abs_path_to_pkl="inferences/mock_study_1/npa_b0_is_0_6/alpha_is_0.1/synthetic_des_like_drawing_ground_is_flat_EDE_while_s_model_is_non-parametric/",
+                                                   **inference_args)
 
-init_field = LH.meta.ZP.adjoint(LH.meta.s_model(LH.meta.init_pos))
-plot_charm2(posterior_samples, LH, plot_domain="signal", plot_mode='synthetic', **dict(show_comparison_fields=True,
-                                                                                       further_samples=[init_field],
-                                                                                       labels_further_samples=['Initial field']))
+plot_charm2(posterior_samples, LH, plot_domain="signal", plot_mode='synthetic', **dict(show_comparison_fields=True))

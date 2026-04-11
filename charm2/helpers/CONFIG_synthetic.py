@@ -21,8 +21,6 @@ from .utilitites import construct_initial_position
 from .custom_correlated_field import CustomSimpleCorrelatedField
 from .CONFIG_cosmological import ic_sampling_lin, ic_sampling_nl, geoVI_sampling_minimizer, ic_newton, descent_finder
 
-from dataclasses import dataclass
-
 __all__ = ["synthetic_likelihood"]
 
 
@@ -201,12 +199,13 @@ def synthetic_likelihood(init_fluctuations_parameter, data_generation_args:DataA
             if direction != "<" and direction != ">":
                 raise ValueError("The first element of dga.apply_shift_where needs to be '<' or '>'")
             x0 = dga.apply_shift_where[1]
+            m0 = dga.custom_data_shift
             if direction == "<":
                 indcs_to_shift = np.where(neg_a_mag < x0)
             else:
                 indcs_to_shift = np.where(neg_a_mag > x0)
             bump_vals = np.zeros_like(d.val)
-            bump_vals[indcs_to_shift] = x0
+            bump_vals[indcs_to_shift] = m0
             d = d + ift.Field.from_raw(d.domain, arr=bump_vals)
 
 
