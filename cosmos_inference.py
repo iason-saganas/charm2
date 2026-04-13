@@ -9,8 +9,8 @@ np.random.seed(seed)
 LH = cosmological_likelihood(data_to_use="Union2.1", mode='non-parametric', init_fluctuations_parameter=0.6)
 # LH = cosmological_likelihood(data_to_use="DESY5", mode='flat_LCDM')
 
-global_iterations = 100
-kl_rate = lambda itr: 50 if itr < 99 else 100
+global_iterations = 1
+kl_rate = 1
 
 
 inference_args = dict(likelihood_energy=LH.like,
