@@ -68,7 +68,8 @@ __all__ = ['create_plot_1', 'unidirectional_radial_los', 'build_response', 'kl_s
            'plot_prior_cfm_samples', 'posterior_parameters', 'visualize_posterior_histograms',
            'construct_initial_position', 'evolving_dark_energy_fit', 'optimize_kl_and_store_metadata', '_LhContainer',
            '_LhMetaContainer', 'FlatLCDM', 'FlatEDE', 'data_dir', 'signal_from_H0', 'DataArgs', 'GroundTruthArgs',
-           'plot_synthetic_residual', 'special_legend_III', 'build_flat_lcdm_func', 'build_flat_evolving_dark_energy']
+           'plot_synthetic_residual', 'special_legend_III', 'build_flat_lcdm_func', 'build_flat_evolving_dark_energy',
+           'draw_hubble_diagrams']
 
 
 def LineModel(target: RGSpace, args: dict, custom_slope: float = None):
@@ -789,6 +790,9 @@ def build_flat_evolving_dark_energy(x: np.array, H_0=68.37, w_a=-8.8, w_0=-0.36,
     # w_a = -1.37
     # w_0 = -0.67
     # omega_m0 = 0.31
+
+    print("build_flat_evolving_dark_energy note: overriding H0 with self-determined flat-w0waCDM fit value!")
+    H_0 = 68.1
 
     omega_l0 = 1 - omega_m0
     m = 3 / (8 * np.pi * G)
@@ -1953,14 +1957,17 @@ def special_legend_IV():
     plt.legend(handles, labels, loc="upper left", fontsize=25)
 
 
-def draw_hubble_diagrams(show=False, save=False, only_show_hist=False):
+def draw_hubble_diagrams(show=False, save=False, only_show_hist=False, fn=""):
     z_u, mu_u, covariance_u = read_data_union()
     z_p, mu_p, _ = read_data_pantheon()
     z_d, mu_d, _ = read_data_des()
+    z_d_dov, mu_d_dov, _ = read_data_des_dovekie()
 
     convert_to_x = lambda z: np.log(1+z)
-    x_u, x_p, x_d = [convert_to_x(z) for z in [z_u, z_p, z_d]]
+    x_u, x_p, x_d, x_d_dov = [convert_to_x(z) for z in [z_u, z_p, z_d, z_d_dov]]
 
+    print("min max mean, num", np.min(z_d_dov), np.max(z_d_dov), np.mean(z_d_dov), len(z_d_dov))
+    stop
 
     min_redshift = np.log(1+0)
     max_redshift = np.log(1+2.26)
@@ -1969,8 +1976,9 @@ def draw_hubble_diagrams(show=False, save=False, only_show_hist=False):
         plt.subplot(2, 1, 1)
 
     n_u, bins_u, _ = plt.hist(x_u, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="-", color=(0,0,0,0))
-    n_p, bins_p, _ = plt.hist(x_p, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="", color=(0,0,0,0))
-    n_d, bins_d, _ = plt.hist(x_d, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="", color=(0,0,0,0))
+    n_p, bins_p, _ = plt.hist(x_p, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="-", color=(0,0,0,0))
+    n_d, bins_d, _ = plt.hist(x_d, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="-", color=(0,0,0,0))
+    n_d_dov, bins_d_dov, _ = plt.hist(x_d_dov, bins=10, range=(min_redshift, max_redshift), histtype="step", lw=0, ls="-", color=(0,0,0,0))
 
     # Manually create step-like plot with constant height over each bin
     bin_centers_u = np.repeat(bins_u, 2)[1:-1]
@@ -1988,12 +1996,20 @@ def draw_hubble_diagrams(show=False, save=False, only_show_hist=False):
     bin_centers_d = np.insert(bin_centers_d, 0, 0)  # Insert 0 at the beginning
     n_repeated_d = np.insert(n_repeated_d, 0, 0)  # Insert 0 at the beginning
 
+    bin_centers_d_dov = np.repeat(bins_d_dov, 2)[1:-1]
+    n_repeated_d_dov = np.repeat(n_d_dov, 2)
+    bin_centers_d_dov = np.insert(bin_centers_d_dov, 0, 0)  # Insert 0 at the beginning
+    n_repeated_d_dov = np.insert(n_repeated_d_dov, 0, 0)  # Insert 0 at the beginning
+
+
     plt.plot(bin_centers_u, n_repeated_u, linestyle="-", markersize=0, color="black", lw=1,
              label="Union2.1")
     plt.plot(bin_centers_p, n_repeated_p, linestyle="--", markersize=0, color="black", lw=1, dashes=[8, 5],
              label="Pantheon+")
     plt.plot(bin_centers_d, n_repeated_d, linestyle="-.", markersize=0, color="black", lw=1, dashes=[20, 8],
              label="DESY5")
+    # plt.plot(bin_centers_d_dov, n_repeated_d_dov, linestyle="-.", markersize=0, color="black", lw=1.5, dashes=[20, 8],
+    #          label="DESY5-Dovekie")
     # dashes for desy5 was: dashes=[20, 15, 1, 1]
     plt.ylabel("Number of SN", fontsize=30)
     plt.xlabel(r"$x=\mathrm{ln}(1+z)$", fontsize=30)
@@ -2014,7 +2030,8 @@ def draw_hubble_diagrams(show=False, save=False, only_show_hist=False):
 
     plt.tight_layout()
     if save:
-        plt.savefig("data_storage/figures/hubble_diagram.pdf", format="pdf")
+        fn = fn if (fn != "") else "data_storage/figures/hubble_diagram.pdf"
+        plt.savefig(fn, format="pdf")
     if show:
         plt.show()
     plt.clf()

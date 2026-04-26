@@ -1,5 +1,7 @@
 import os
 
+import numpy as np
+
 from charm2 import *
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
@@ -36,6 +38,20 @@ if b0 == 0.2:
 elif b0 == 0.6:
     red_chi2_y2 = [0.9725, 0.9729, 0.9770, 0.9794, 1.0197]  # charm2 npa red χ^2
     red_chi2_y2_err = [0.0019, 0.0023, 0.0118, 0.0093,  0.1107]  # charm2 npa red χ^2 error
+
+    # Check out denser sampling
+    # print(np.linspace(0.4, 0.01, 7))
+    # plt.plot(alpha, red_chi2_y2)
+    # from scipy.interpolate import interp1d
+    # interp_chi2 = interp1d(alpha, red_chi2_y2, kind='linear')
+    #
+    # dense_alpha = np.linspace(0.4, 0.01, 7)
+    # red_chi2_y2_dense = interp_chi2(dense_alpha)
+    #
+    # plt.plot(alpha, red_chi2_y2)
+    # plt.plot(dense_alpha, red_chi2_y2_dense, "b.")
+    # plt.show()
+
 else:
     raise ValueError("b0 must be either 0.2 or 0.6")
 
@@ -47,6 +63,7 @@ labels = [r'Flat $\Lambda\mathrm{CDM}$ fit', r'Flat $w_0w_a\mathrm{CDM}$ fit', r
 
 fontsize_of_legend = 25
 fontsize_of_labels = 30
+fontsize_of_text = 20
 
 default_height = 2/3*8
 default_widht = 10
@@ -64,13 +81,28 @@ ax2.errorbar(alpha, red_chi2_y3, yerr=red_chi2_y3_err, color='black', ecolor='bl
 
 ax1.legend(fontsize=fontsize_of_legend)
 
-ax2.set_xlabel("DESY5 covariance reduction factor", fontsize=fontsize_of_labels)
+ax2.set_xlabel("Scaling of DESY5 covariance", fontsize=fontsize_of_labels)
 ax1.set_ylabel("ELBO", fontsize=fontsize_of_labels)
 ax2.set_ylabel(r"Reduced $\chi^2$", fontsize=fontsize_of_labels)
 
-plt.tight_layout()
-# plt.show()
+# Add some embellishements
+x_txt_1, y_txt_1 = 0.15, 1.3
+x_txt_2, y_txt_2 = 0.85, 1.3
+ax2.text(x_txt_1, y_txt_1, "High signal-to-noise", fontsize=fontsize_of_text, horizontalalignment='left')
+ax2.text(x_txt_2, y_txt_2, "Low signal-to-noise", fontsize=fontsize_of_text, horizontalalignment='right')
 
+y_arr = 1.28
+dx_arr = 0.1
+dx_shift = -.07
+ax2.annotate("", xy=(x_txt_1-0.03, y_arr), xytext=(x_txt_1+dx_arr, y_arr),
+            arrowprops=dict(arrowstyle="->", lw=2, mutation_scale=20))
+ax2.annotate("", xytext=(x_txt_2-0.03+dx_shift, y_arr), xy=(x_txt_2+dx_arr+dx_shift, y_arr),
+            arrowprops=dict(arrowstyle="->", lw=2, mutation_scale=20))
+
+plt.tight_layout()
+plt.show()
+
+stop
 current_file = Path(__file__)
 project_root = current_file.parents[2]
 fig_dir = Path(project_root, "figures")

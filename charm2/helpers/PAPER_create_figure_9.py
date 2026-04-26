@@ -63,3 +63,4 @@ os.makedirs(fig_dir, exist_ok=True)
 fn = f"PAPER_des_vincenci_vs_dovekie_b0_{b0}.pdf"
 filename = str(Path(fig_dir, fn))
 plt.savefig(filename)
+# plt.show()
