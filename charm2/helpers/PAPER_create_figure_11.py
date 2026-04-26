@@ -9,54 +9,56 @@ import nifty.cl as ift
 from datetime import datetime
 
 # comparison of ELBOs und χ^2
-
-b0 = 0.6
-
-alpha = [1, 0.5, 0.1, 0.05, 0.01]  # reduction factor of covariance
-
-elbo_y1 = [-894.191, -899.604, -934.77, -975.062, -1280.19]  # flat ΛCDM ELBO
-elbo_y1_err = [0.847919, 0.846007, 0.843463, 0.842865, 0.842069]  # flat ΛCDM ELBO error
+b0 = 0.6  # choose 0.2 or 0.6
+# -----
 
 if b0 == 0.2:
+
+    alpha = [1, 0.5, 0.1, 0.05, 0.01]  # reduction factor of covariance
+
+    elbo_y1 = [-894.191, -899.604, -934.77, -975.062, -1280.19]  # flat ΛCDM ELBO
+    elbo_y1_err = [0.847919, 0.846007, 0.843463, 0.842865, 0.842069]  # flat ΛCDM ELBO error
+
     elbo_y2 = [-907.925, -911.071, -924.789, -934.488, -966.532]  # charm2 npa ELBO
     elbo_y2_err = [3.03564, 3.00387, 7.62482, 9.13314, 28.82]  # charm2 npa ELBO error
-elif b0 == 0.6:
-    elbo_y2 = [-905.506,  -908.031, -917.679, -922.94, -968.224]  # charm2 npa ELBO
-    elbo_y2_err = [1.76812, 2.14652, 10.8143, 8.56144, 101.711]  # charm2 npa ELBO error
-else:
-    raise ValueError("b0 must be either 0.2 or 0.6")
 
-elbo_y3 = [-895.28, -895.014, -898.007, -899.369, -985.927]  # flat w0waCDM ELBO
-elbo_y3_err = [4.06084, 1.25156, 1.23565, 1.24519, 27.2122]  # flat w0waCDM ELBO error
+    elbo_y3 = [-895.28, -895.014, -898.007, -899.369, -985.927]  # flat w0waCDM ELBO
+    elbo_y3_err = [4.06084, 1.25156, 1.23565, 1.24519, 27.2122]  # flat w0waCDM ELBO error
 
-red_chi2_y1 = [0.9692, 0.9744, 1.0111, 1.0544, 1.3862]  # flat ΛCDM red χ^2
-red_chi2_y1_err = [0.0009, 0.0009, 0.0009, 0.0009, 0.0009]  # flat ΛCDM red χ^2 error
+    red_chi2_y1 = [0.9692, 0.9744, 1.0111, 1.0544, 1.3862]  # flat ΛCDM red χ^2
+    red_chi2_y1_err = [0.0009, 0.0009, 0.0009, 0.0009, 0.0009]  # flat ΛCDM red χ^2 error
 
-if b0 == 0.2:
     red_chi2_y2 = [0.9746, 0.9751, 0.9786, 0.9806, 0.9920]  # charm2 npa red χ^2
-    red_chi2_y2_err = [0.0033,0.0033,0.0083, 0.0099, 0.0314]  # charm2 npa red χ^2 error
-elif b0 == 0.6:
-    red_chi2_y2 = [0.9725, 0.9729, 0.9770, 0.9794, 1.0197]  # charm2 npa red χ^2
-    red_chi2_y2_err = [0.0019, 0.0023, 0.0118, 0.0093,  0.1107]  # charm2 npa red χ^2 error
+    red_chi2_y2_err = [0.0033, 0.0033, 0.0083, 0.0099, 0.0314]  # charm2 npa red χ^2 error
 
-    # Check out denser sampling
-    # print(np.linspace(0.4, 0.01, 7))
-    # plt.plot(alpha, red_chi2_y2)
-    # from scipy.interpolate import interp1d
-    # interp_chi2 = interp1d(alpha, red_chi2_y2, kind='linear')
-    #
-    # dense_alpha = np.linspace(0.4, 0.01, 7)
-    # red_chi2_y2_dense = interp_chi2(dense_alpha)
-    #
-    # plt.plot(alpha, red_chi2_y2)
-    # plt.plot(dense_alpha, red_chi2_y2_dense, "b.")
-    # plt.show()
+    red_chi2_y3 = [0.9657, 0.9652, 0.9652, 0.9652, 1.0551]  # flat w0waCDM red χ^2
+    red_chi2_y3_err = [0.0044, 0.0014, 0.0013, 0.0014, 0.0296]  # flat w0waCDM red χ^2 error
+
+elif b0 == 0.6:
+
+    alpha = [1, 0.5, 0.4, 0.335, 0.27, 0.205, 0.14, 0.1, 0.075, 0.05, 0.01]
+
+    elbo_y1 = [-894.191, -899.604, -902.079, -904.4, -907.736, -913.011, -922.81, -934.77, -948.398, -975.062, -1280.19]  # flat ΛCDM ELBO
+    elbo_y1_err = [0.847919, 0.846007, 0.84552, 0.84517, 0.844784, 0.844349, 0.843839, 0.843463, 0.843189, 0.842865, 0.842069]  # flat ΛCDM ELBO error
+
+    elbo_y2 = [-905.506, -908.031, -909.109, -910.575, -910.678,  -912.225, -914.986, -917.679, -920.302, -922.94, -968.224 ]  # charm2 npa ELBO
+    elbo_y2_err = [1.76812, 2.14652, 3.17094, 5.38346, 2.6396, 3.06017, 5.42915, 10.8143, 13.9817, 8.56144, 101.711]  # charm2 npa ELBO error
+
+    elbo_y3 = [-895.28, -895.014, -898.854, -900.457, -898.557, -896.616, -897.352, -898.007, -898.569, -899.369, -985.927]  # flat w0waCDM ELBO
+    elbo_y3_err = [4.06084, 1.25156, 17.1502, 24.0022, 2.9245, 1.22503, 1.23097, 1.23565, 1.24006, 1.24519, 27.2122]  # flat w0waCDM ELBO error
+
+    red_chi2_y1 = [0.9692, 0.9744, 0.9768, 0.9792, 0.9862, 0.9880, 0.9983, 1.0111, 1.0256, 1.0544, 1.3862]  # flat ΛCDM red χ^2
+    red_chi2_y1_err = [0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009]  # flat ΛCDM red χ^2 error
+
+    red_chi2_y2 = [0.9725, 0.9729, 0.9733, 0.9744, 0.9736, 0.9742, 0.9755, 0.9770, 0.9785, 0.9794, 1.0197]  # charm2 npa red χ^2
+    red_chi2_y2_err = [0.0019, 0.0023, 0.0035, 0.0059, 0.0029, 0.0033, 0.0059, 0.0118, 0.0152, 0.0093, 0.1107]  # charm2 npa red χ^2 error
+
+    red_chi2_y3 = [0.9657, 0.9652, 0.9681, 0.969, 0.9673, 0.9652, 0.9652, 0.9652, 0.9652, 0.9652, 1.0551]  # flat w0waCDM red χ^2
+    red_chi2_y3_err = [0.0044, 0.0014, 0.0187, 0.0261, 0.0032, 0.0013, 0.0013, 0.0013, 0.0013, 0.0014, 0.0296]  # flat w0waCDM red χ^2 error
 
 else:
     raise ValueError("b0 must be either 0.2 or 0.6")
 
-red_chi2_y3 = [0.9657, 0.9652, 0.9652, 0.9652, 1.0551]  #  flat w0waCDM red χ^2
-red_chi2_y3_err = [0.0044, 0.0014, 0.0013, 0.0014, 0.0296]  #  flat w0waCDM red χ^2 error
 
 labels = [r'Flat $\Lambda\mathrm{CDM}$ fit', r'Flat $w_0w_a\mathrm{CDM}$ fit', r'$\texttt{charm2}$ reconstruction']
 
@@ -100,9 +102,9 @@ ax2.annotate("", xytext=(x_txt_2-0.03+dx_shift, y_arr), xy=(x_txt_2+dx_arr+dx_sh
             arrowprops=dict(arrowstyle="->", lw=2, mutation_scale=20))
 
 plt.tight_layout()
-plt.show()
+# plt.show()
+# stop
 
-stop
 current_file = Path(__file__)
 project_root = current_file.parents[2]
 fig_dir = Path(project_root, "figures")
